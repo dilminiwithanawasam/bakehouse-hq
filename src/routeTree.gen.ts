@@ -15,6 +15,13 @@ import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
+import { Route as AppWastageRouteImport } from './routes/app.wastage'
+import { Route as AppUsersRouteImport } from './routes/app.users'
+import { Route as AppStockRouteImport } from './routes/app.stock'
+import { Route as AppSettingsRouteImport } from './routes/app.settings'
+import { Route as AppSalesRouteImport } from './routes/app.sales'
+import { Route as AppReportsRouteImport } from './routes/app.reports'
+import { Route as AppDashboardRouteImport } from './routes/app.dashboard'
 
 const UnauthorizedRoute = UnauthorizedRouteImport.update({
   id: '/unauthorized',
@@ -46,6 +53,41 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppWastageRoute = AppWastageRouteImport.update({
+  id: '/wastage',
+  path: '/wastage',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppUsersRoute = AppUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppStockRoute = AppStockRouteImport.update({
+  id: '/stock',
+  path: '/stock',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSalesRoute = AppSalesRouteImport.update({
+  id: '/sales',
+  path: '/sales',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppReportsRoute = AppReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDashboardRoute = AppDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -53,6 +95,13 @@ export interface FileRoutesByFullPath {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/unauthorized': typeof UnauthorizedRoute
+  '/app/dashboard': typeof AppDashboardRoute
+  '/app/reports': typeof AppReportsRoute
+  '/app/sales': typeof AppSalesRoute
+  '/app/settings': typeof AppSettingsRoute
+  '/app/stock': typeof AppStockRoute
+  '/app/users': typeof AppUsersRoute
+  '/app/wastage': typeof AppWastageRoute
   '/app/': typeof AppIndexRoute
 }
 export interface FileRoutesByTo {
@@ -60,6 +109,13 @@ export interface FileRoutesByTo {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/unauthorized': typeof UnauthorizedRoute
+  '/app/dashboard': typeof AppDashboardRoute
+  '/app/reports': typeof AppReportsRoute
+  '/app/sales': typeof AppSalesRoute
+  '/app/settings': typeof AppSettingsRoute
+  '/app/stock': typeof AppStockRoute
+  '/app/users': typeof AppUsersRoute
+  '/app/wastage': typeof AppWastageRoute
   '/app': typeof AppIndexRoute
 }
 export interface FileRoutesById {
@@ -69,6 +125,13 @@ export interface FileRoutesById {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/unauthorized': typeof UnauthorizedRoute
+  '/app/dashboard': typeof AppDashboardRoute
+  '/app/reports': typeof AppReportsRoute
+  '/app/sales': typeof AppSalesRoute
+  '/app/settings': typeof AppSettingsRoute
+  '/app/stock': typeof AppStockRoute
+  '/app/users': typeof AppUsersRoute
+  '/app/wastage': typeof AppWastageRoute
   '/app/': typeof AppIndexRoute
 }
 export interface FileRouteTypes {
@@ -79,9 +142,28 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/unauthorized'
+    | '/app/dashboard'
+    | '/app/reports'
+    | '/app/sales'
+    | '/app/settings'
+    | '/app/stock'
+    | '/app/users'
+    | '/app/wastage'
     | '/app/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/forgot-password' | '/login' | '/unauthorized' | '/app'
+  to:
+    | '/'
+    | '/forgot-password'
+    | '/login'
+    | '/unauthorized'
+    | '/app/dashboard'
+    | '/app/reports'
+    | '/app/sales'
+    | '/app/settings'
+    | '/app/stock'
+    | '/app/users'
+    | '/app/wastage'
+    | '/app'
   id:
     | '__root__'
     | '/'
@@ -89,6 +171,13 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/unauthorized'
+    | '/app/dashboard'
+    | '/app/reports'
+    | '/app/sales'
+    | '/app/settings'
+    | '/app/stock'
+    | '/app/users'
+    | '/app/wastage'
     | '/app/'
   fileRoutesById: FileRoutesById
 }
@@ -144,14 +233,77 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/wastage': {
+      id: '/app/wastage'
+      path: '/wastage'
+      fullPath: '/app/wastage'
+      preLoaderRoute: typeof AppWastageRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/users': {
+      id: '/app/users'
+      path: '/users'
+      fullPath: '/app/users'
+      preLoaderRoute: typeof AppUsersRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/stock': {
+      id: '/app/stock'
+      path: '/stock'
+      fullPath: '/app/stock'
+      preLoaderRoute: typeof AppStockRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/settings': {
+      id: '/app/settings'
+      path: '/settings'
+      fullPath: '/app/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/sales': {
+      id: '/app/sales'
+      path: '/sales'
+      fullPath: '/app/sales'
+      preLoaderRoute: typeof AppSalesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/reports': {
+      id: '/app/reports'
+      path: '/reports'
+      fullPath: '/app/reports'
+      preLoaderRoute: typeof AppReportsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/dashboard': {
+      id: '/app/dashboard'
+      path: '/dashboard'
+      fullPath: '/app/dashboard'
+      preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
+  AppDashboardRoute: typeof AppDashboardRoute
+  AppReportsRoute: typeof AppReportsRoute
+  AppSalesRoute: typeof AppSalesRoute
+  AppSettingsRoute: typeof AppSettingsRoute
+  AppStockRoute: typeof AppStockRoute
+  AppUsersRoute: typeof AppUsersRoute
+  AppWastageRoute: typeof AppWastageRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppDashboardRoute: AppDashboardRoute,
+  AppReportsRoute: AppReportsRoute,
+  AppSalesRoute: AppSalesRoute,
+  AppSettingsRoute: AppSettingsRoute,
+  AppStockRoute: AppStockRoute,
+  AppUsersRoute: AppUsersRoute,
+  AppWastageRoute: AppWastageRoute,
   AppIndexRoute: AppIndexRoute,
 }
 

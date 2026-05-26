@@ -1,0 +1,152 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
+import {
+  Bar, BarChart, CartesianGrid, Line, LineChart,
+  ResponsiveContainer, Tooltip, XAxis, YAxis, Legend,
+} from "recharts";
+import { Download, FileText, FileSpreadsheet } from "lucide-react";
+
+import { PageHeader } from "@/components/page-header";
+import { ChartCard } from "@/components/dashboard/chart-card";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { ProtectedRoute } from "@/components/protected-route";
+import { DAILY_SALES_TREND, PRODUCTS, SALES, WASTAGES, productName, currency } from "@/lib/mock-data";
+import { toast } from "sonner";
+
+export const Route = createFileRoute("/app/reports")({
+  component: () => <ProtectedRoute roles={["admin", "manager"]}><ReportsPage /></ProtectedRoute>,
+});
+
+function ReportsPage() {
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [product, setProduct] = useState("all");
+  const [cat, setCat] = useState("all");
+
+  const productRanking = PRODUCTS.map(p => {
+    const sold = SALES.flatMap(s => s.items).filter(i => i.productId === p.id).reduce((a, b) => a + b.qty, 0);
+    const wasted = WASTAGES.filter(w => w.productId === p.id).reduce((a, b) => a + b.qty, 0);
+    return { name: p.name, sold, wasted };
+  }).sort((a, b) => b.sold - a.sold).slice(0, 8);
+
+  const download = (kind: string) => toast.success(`${kind} download queued`);
+
+  return (
+    <>
+      <PageHeader
+        title="Reports & analytics"
+        description="Cross-cut your operations with date, product and category filters."
+        actions={
+          <>
+            <Button variant="outline" size="sm" onClick={() => download("PDF")}>
+              <FileText className="h-4 w-4 mr-2" />PDF
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => download("CSV")}>
+              <FileSpreadsheet className="h-4 w-4 mr-2" />CSV
+            </Button>
+            <Button size="sm" onClick={() => download("Report")}>
+              <Download className="h-4 w-4 mr-2" />Generate
+            </Button>
+          </>
+        }
+      />
+
+      <Card className="rounded-xl p-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">From</Label>
+            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">To</Label>
+            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Product</Label>
+            <Select value={product} onValueChange={setProduct}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All products</SelectItem>
+                {PRODUCTS.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Category</Label>
+            <Select value={cat} onValueChange={setCat}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                {Array.from(new Set(PRODUCTS.map(p => p.category))).map(c =>
+                  <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+        <ChartCard title="Revenue trend" description="Last 14 days">
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={DAILY_SALES_TREND}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+              <XAxis dataKey="date" stroke="var(--muted-foreground)" fontSize={11} tickLine={false} axisLine={false} />
+              <YAxis stroke="var(--muted-foreground)" fontSize={11} tickLine={false} axisLine={false} />
+              <Tooltip contentStyle={tooltipStyle} />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Line type="monotone" dataKey="revenue" stroke="var(--chart-1)" strokeWidth={2} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="orders" stroke="var(--chart-2)" strokeWidth={2} dot={{ r: 3 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        <ChartCard title="Product ranking" description="Sold vs wasted units">
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={productRanking}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+              <XAxis dataKey="name" stroke="var(--muted-foreground)" fontSize={10} tickLine={false} axisLine={false} interval={0} angle={-25} textAnchor="end" height={70} />
+              <YAxis stroke="var(--muted-foreground)" fontSize={11} tickLine={false} axisLine={false} />
+              <Tooltip contentStyle={tooltipStyle} />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Bar dataKey="sold" fill="var(--chart-1)" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="wasted" fill="var(--chart-3)" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      </div>
+
+      <Card className="rounded-xl p-5 mt-4">
+        <h3 className="font-semibold mb-4">Sales report preview</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-left text-muted-foreground border-b">
+              <tr><th className="py-2">Date</th><th>Sale #</th><th>Cashier</th><th>Items</th><th className="text-right">Total</th></tr>
+            </thead>
+            <tbody>
+              {SALES.slice(0, 10).map(s => (
+                <tr key={s.id} className="border-b last:border-0">
+                  <td className="py-2 text-muted-foreground">{s.date}</td>
+                  <td className="font-medium">#{s.id.toUpperCase()}</td>
+                  <td>{s.cashier}</td>
+                  <td>{s.items.map(i => `${productName(i.productId)}×${i.qty}`).join(", ")}</td>
+                  <td className="text-right font-semibold">{currency(s.total)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </>
+  );
+}
+
+const tooltipStyle: React.CSSProperties = {
+  background: "var(--popover)", border: "1px solid var(--border)",
+  borderRadius: 8, fontSize: 12, color: "var(--foreground)",
+};

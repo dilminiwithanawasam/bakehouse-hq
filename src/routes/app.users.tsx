@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -29,7 +30,8 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ProtectedRoute } from "@/components/protected-route";
-import { MOCK_USERS, type Role, type User } from "@/lib/mock-data";
+import { type Role, type User } from "@/lib/mock-data";
+import { api } from "@/lib/api";
 import { ROLE_LABEL } from "@/lib/auth";
 
 export const Route = createFileRoute("/app/users")({
@@ -44,7 +46,8 @@ const schema = z.object({
 type FormVals = z.infer<typeof schema>;
 
 function UsersPage() {
-  const [users, setUsers] = useState<User[]>(MOCK_USERS);
+  const qc = useQueryClient();
+  const { data: users = [], isLoading } = useQuery({ queryKey: ["users"], queryFn: api.listUsers });
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
@@ -59,28 +62,35 @@ function UsersPage() {
     setOpen(true);
   };
 
+  const createUserMut = useMutation({
+    mutationFn: (payload: any) => api.createUser(payload),
+    onSuccess: () => { toast.success("User created"); qc.invalidateQueries(["users"]); setOpen(false); },
+    onError: (e: any) => toast.error(e?.message || "Create failed"),
+  });
+
+  const updateUserMut = useMutation({
+    mutationFn: ({ id, payload }: any) => api.updateUser(id, payload),
+    onSuccess: () => { toast.success("User updated"); qc.invalidateQueries(["users"]); setOpen(false); },
+    onError: (e: any) => toast.error(e?.message || "Update failed"),
+  });
+
   const onSubmit = (v: FormVals) => {
     if (editing) {
-      setUsers(prev => prev.map(u => u.id === editing.id ? { ...u, ...v } : u));
-      toast.success("User updated");
+      updateUserMut.mutate({ id: editing.id, payload: v });
     } else {
-      setUsers(prev => [...prev, {
-        id: `u${Date.now()}`, ...v, status: "active",
-        lastLogin: "—",
-      }]);
-      toast.success("User created");
+      createUserMut.mutate(v);
     }
-    setOpen(false);
   };
 
   const toggleStatus = (u: User) => {
-    setUsers(prev => prev.map(x => x.id === u.id ? { ...x, status: x.status === "active" ? "disabled" : "active" } : x));
-    toast.success(`${u.name} ${u.status === "active" ? "disabled" : "enabled"}`);
+    api.toggleUserStatus(u.id).then(() => { toast.success("Status updated"); qc.invalidateQueries(["users"]); }).catch((e) => toast.error(e?.message || "Failed"));
   };
 
-  const resetPassword = (u: User) => toast.success(`Reset link sent to ${u.email}`);
+  const resetPassword = (u: User) => {
+    api.resetUserPassword(u.id).then(() => toast.success("Reset email sent")).catch((e) => toast.error(e?.message || "Failed"));
+  };
 
-  const filtered = users.filter(u =>
+  const filtered = (users as User[]).filter(u =>
     `${u.name} ${u.email} ${u.role}`.toLowerCase().includes(query.toLowerCase())
   );
 

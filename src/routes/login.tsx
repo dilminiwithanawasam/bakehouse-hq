@@ -47,12 +47,8 @@ function LoginPage() {
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
       {/* Left: branding */}
-      <div className="hidden lg:flex relative flex-col justify-between p-12 bg-gradient-to-br from-primary via-primary to-[oklch(0.38_0.07_45)] text-primary-foreground overflow-hidden">
-        <div className="absolute inset-0 opacity-20" style={{
-          backgroundImage:
-            "radial-gradient(circle at 20% 20%, white 1px, transparent 1px), radial-gradient(circle at 80% 60%, white 1px, transparent 1px)",
-          backgroundSize: "40px 40px, 60px 60px",
-        }} />
+      <div className="hidden lg:flex relative flex-col justify-between p-12 login-gradient text-primary-foreground overflow-hidden">
+        <div className="absolute inset-0 opacity-20 login-bg-dots" />
         <div className="relative flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-white/15 backdrop-blur grid place-items-center">
             <Croissant className="h-5 w-5" />

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Plus, Trash2, ShoppingCart, Loader2 } from "lucide-react";
@@ -17,7 +17,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
-import { PRODUCTS, currency } from "@/lib/mock-data";
+import { currency, type Product } from "@/lib/mock-data";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
@@ -34,16 +34,18 @@ const lineSchema = z.object({
 function SalesPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const { data: products = [], isLoading: productsLoading, isError: productsError } =
+    useQuery<Product[], Error>({ queryKey: ["products"], queryFn: () => api.listProducts() });
+
   const [items, setItems] = useState<LineItem[]>([]);
   const [productId, setProductId] = useState("");
   const [qty, setQty] = useState(1);
-
-  const product = PRODUCTS.find(p => p.id === productId);
+  const product = products.find((p: any) => p.id === productId);
   const grandTotal = items.reduce((s, i) => s + i.qty * i.unitPrice, 0);
   const tax = Math.round(grandTotal * 0.05);
 
   const addItem = () => {
-    const parsed = lineSchema.safeParse({ productId, qty, unitPrice: product?.price ?? 0 });
+    const parsed = lineSchema.safeParse({ productId, qty, unitPrice: Number((product as any)?.price ?? 0) });
     if (!parsed.success) { toast.error("Select a product and a valid quantity"); return; }
     setItems((prev) => [...prev, { id: crypto.randomUUID(), ...parsed.data }]);
     setProductId(""); setQty(1);
@@ -56,9 +58,10 @@ function SalesPage() {
       if (items.length === 0) throw new Error("Add at least one item.");
       return api.createSale({
         date: new Date().toISOString().slice(0, 10),
-        cashier: user?.name ?? "Unknown",
         items: items.map(i => ({ productId: i.productId, qty: i.qty, unitPrice: i.unitPrice })),
-        total: grandTotal,
+        payment_method: "cash",
+        tax_amount: tax,
+        discount_amount: 0,
       });
     },
     onSuccess: () => {
@@ -82,11 +85,15 @@ function SalesPage() {
                 <Select value={productId} onValueChange={setProductId}>
                   <SelectTrigger><SelectValue placeholder="Select a bakery item…" /></SelectTrigger>
                   <SelectContent>
-                    {PRODUCTS.map(p => (
+                    {productsLoading && (
+                      <SelectItem value="">Loading…</SelectItem>
+                    )}
+                    {products.map((p: any) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.name} <span className="text-muted-foreground">· {currency(p.price)}</span>
                       </SelectItem>
                     ))}
+                    {productsError && <SelectItem value="">Failed to load</SelectItem>}
                   </SelectContent>
                 </Select>
               </div>
@@ -123,7 +130,7 @@ function SalesPage() {
                   </TableRow>
                 )}
                 {items.map(i => {
-                  const p = PRODUCTS.find(pp => pp.id === i.productId);
+                  const p = products.find((pp: any) => pp.id === i.productId);
                   return (
                     <TableRow key={i.id}>
                       <TableCell className="font-medium">{p?.name}</TableCell>

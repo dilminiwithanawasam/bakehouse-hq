@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend,
   Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -17,10 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/lib/auth";
-import {
-  SALES, WASTAGES, PRODUCTS, SALES_BY_HOUR, DAILY_SALES_TREND, CATEGORY_BREAKDOWN,
-  currency, productName,
-} from "@/lib/mock-data";
+import { currency } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/app/dashboard")({ component: DashboardPage });
 
@@ -33,27 +32,18 @@ function DashboardPage() {
 }
 
 function ExecutiveDashboard() {
-  const today = new Date().toISOString().slice(0, 10);
-  const todaySales = SALES.filter(s => s.date === today);
-  const totalSalesToday = todaySales.reduce((s, x) => s + x.total, 0);
-  const totalItemsToday = todaySales.reduce((s, x) => s + x.items.reduce((a, i) => a + i.qty, 0), 0);
-  const wastageCost = WASTAGES.filter(w => w.date === today).reduce((s, w) => s + w.loss, 0);
+  const { data: dashboard } = useQuery({ queryKey: ["dashboard"], queryFn: api.getDashboardData });
 
-  const lowStock = PRODUCTS.filter(p => p.stock <= p.minStock);
-  const productSales = useMemo(() => {
-    const map = new Map<string, number>();
-    SALES.forEach(s => s.items.forEach(i => map.set(i.productId, (map.get(i.productId) ?? 0) + i.qty)));
-    return Array.from(map.entries())
-      .map(([id, qty]) => ({ id, name: productName(id), qty }))
-      .sort((a, b) => b.qty - a.qty);
-  }, []);
+  const todayStats = dashboard?.today_stats || {};
+  const totalSalesToday = todayStats.sales?.total_revenue || 0;
+  const totalItemsToday = todayStats.sales?.transaction_count || 0;
+  const wastageCost = dashboard?.wastage?.total_loss || 0;
+
+  const lowStock = dashboard?.low_stock_alerts || [];
+  const productSales = (dashboard?.top_products || []).map((p: any) => ({ id: p.product__id || p.product_id || p.id, name: p.product__name || p.product_name || p.name, qty: p.total_qty || 0 }));
   const best = productSales[0];
 
-  const wastageTrend = useMemo(() => {
-    const map = new Map<string, number>();
-    WASTAGES.forEach(w => map.set(w.date, (map.get(w.date) ?? 0) + w.loss));
-    return Array.from(map.entries()).sort().map(([date, loss]) => ({ date: date.slice(5), loss }));
-  }, []);
+  const wastageTrend = (dashboard?.wastage_breakdown || []).map((w: any) => ({ date: w.date?.slice?.(5) || w.date || "", loss: w.total_loss || w.total || 0 }));
 
   return (
     <>
@@ -86,7 +76,7 @@ function ExecutiveDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
         <ChartCard title="Daily sales trend" description="Last 14 days" className="lg:col-span-2">
           <ResponsiveContainer width="100%" height={280}>
-            <AreaChart data={DAILY_SALES_TREND}>
+            <AreaChart data={(dashboard?.period_comparison?.current_period?.dates || [])}>
               <defs>
                 <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.35} />
@@ -105,8 +95,8 @@ function ExecutiveDashboard() {
         <ChartCard title="Category mix" description="Share of revenue">
           <ResponsiveContainer width="100%" height={280}>
             <PieChart>
-              <Pie data={CATEGORY_BREAKDOWN} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={3}>
-                {CATEGORY_BREAKDOWN.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+              <Pie data={dashboard?.period_comparison?.current_period?.categories || []} dataKey="total" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={3}>
+                {(dashboard?.period_comparison?.current_period?.categories || []).map((_: any, i: number) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
               </Pie>
               <Tooltip contentStyle={tooltipStyle} />
               <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
@@ -118,7 +108,7 @@ function ExecutiveDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
         <ChartCard title="Sales by hour" description="Today's hourly volume">
           <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={SALES_BY_HOUR}>
+            <BarChart data={dashboard?.period_comparison?.current_period?.hourly || []}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
               <XAxis dataKey="hour" stroke="var(--muted-foreground)" fontSize={10} tickLine={false} axisLine={false} />
               <YAxis stroke="var(--muted-foreground)" fontSize={10} tickLine={false} axisLine={false} />

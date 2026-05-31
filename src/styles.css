@@ -144,3 +144,14 @@
     color: var(--color-foreground);
   }
 }
+
+@layer utilities {
+  .login-gradient {
+    background-image: linear-gradient(to bottom right, var(--primary), var(--primary) 45%, oklch(0.38 0.07 45));
+  }
+
+  .login-bg-dots {
+    background-image: radial-gradient(circle at 20% 20%, white 1px, transparent 1px), radial-gradient(circle at 80% 60%, white 1px, transparent 1px);
+    background-size: 40px 40px, 60px 60px;
+  }
+}

@@ -16,8 +16,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { ProtectedRoute } from "@/components/protected-route";
-import { DAILY_SALES_TREND, PRODUCTS, SALES, WASTAGES, productName, currency } from "@/lib/mock-data";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { currency } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/app/reports")({
   component: () => <ProtectedRoute roles={["admin", "manager"]}><ReportsPage /></ProtectedRoute>,
@@ -29,11 +31,25 @@ function ReportsPage() {
   const [product, setProduct] = useState("all");
   const [cat, setCat] = useState("all");
 
-  const productRanking = PRODUCTS.map(p => {
-    const sold = SALES.flatMap(s => s.items).filter(i => i.productId === p.id).reduce((a, b) => a + b.qty, 0);
-    const wasted = WASTAGES.filter(w => w.productId === p.id).reduce((a, b) => a + b.qty, 0);
-    return { name: p.name, sold, wasted };
-  }).sort((a, b) => b.sold - a.sold).slice(0, 8);
+  const { data: dashboard } = useQuery({ queryKey: ["dashboard"], queryFn: api.getDashboardData });
+  const { data: salesReport } = useQuery({ queryKey: ["reports", "sales", from, to], queryFn: () => api.getSalesReport(from || undefined, to || undefined) });
+  const { data: wastageReport } = useQuery({ queryKey: ["reports", "wastage", from, to], queryFn: () => api.getWastageReport(from || undefined, to || undefined) });
+  const { data: products = [] } = useQuery({ queryKey: ["products"], queryFn: api.listProducts });
+  const { data: recentSales = [] } = useQuery({ queryKey: ["sales", "recent"], queryFn: api.listSales });
+
+  const topProducts = (dashboard?.top_products || []).map((p: any) => ({
+    id: p.product__id || p.product_id || p.id,
+    name: p.product__name || p.product_name || p.name,
+    sold: p.total_qty || p.total_revenue || 0,
+  }));
+
+  const wastageByProduct: Record<string, number> = {};
+  (wastageReport?.by_product || []).forEach((w: any) => {
+    const id = w.product__id || w.product_id || w.id;
+    wastageByProduct[id] = w.total_qty || w.total_loss || 0;
+  });
+
+  const productRanking = topProducts.map((p: any) => ({ name: p.name, sold: p.sold, wasted: wastageByProduct[p.id] || 0 })).slice(0, 8);
 
   const download = (kind: string) => toast.success(`${kind} download queued`);
 
@@ -73,7 +89,7 @@ function ReportsPage() {
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All products</SelectItem>
-                {PRODUCTS.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                {products.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -83,7 +99,7 @@ function ReportsPage() {
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All</SelectItem>
-                {Array.from(new Set(PRODUCTS.map(p => p.category))).map(c =>
+                {Array.from(new Set(products.map((p: any) => p.category))).map(c =>
                   <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -94,7 +110,7 @@ function ReportsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
         <ChartCard title="Revenue trend" description="Last 14 days">
           <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={DAILY_SALES_TREND}>
+            <LineChart data={(salesReport?.by_date || []).map((d: any) => ({ date: d.date, revenue: d.total_revenue || d.total || 0, orders: d.transaction_count || d.transaction_count }))}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
               <XAxis dataKey="date" stroke="var(--muted-foreground)" fontSize={11} tickLine={false} axisLine={false} />
               <YAxis stroke="var(--muted-foreground)" fontSize={11} tickLine={false} axisLine={false} />
@@ -129,13 +145,13 @@ function ReportsPage() {
               <tr><th className="py-2">Date</th><th>Sale #</th><th>Cashier</th><th>Items</th><th className="text-right">Total</th></tr>
             </thead>
             <tbody>
-              {SALES.slice(0, 10).map(s => (
+              {recentSales.slice(0, 10).map((s: any) => (
                 <tr key={s.id} className="border-b last:border-0">
                   <td className="py-2 text-muted-foreground">{s.date}</td>
-                  <td className="font-medium">#{s.id.toUpperCase()}</td>
-                  <td>{s.cashier}</td>
-                  <td>{s.items.map(i => `${productName(i.productId)}×${i.qty}`).join(", ")}</td>
-                  <td className="text-right font-semibold">{currency(s.total)}</td>
+                  <td className="font-medium">#{String(s.id).toUpperCase()}</td>
+                  <td>{s.cashier || s.recordedBy || "—"}</td>
+                  <td>{(s.items || []).map((i: any) => `${products.find((p: any) => p.id === i.product || i.productId)?.name || i.product || i.productId}×${i.quantity || i.qty}`).join(", ")}</td>
+                  <td className="text-right font-semibold">{currency(s.total || s.grand_total || 0)}</td>
                 </tr>
               ))}
             </tbody>

@@ -29,7 +29,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PRODUCTS, currency, productName, type WastageReason } from "@/lib/mock-data";
+import { currency, productName as mockProductName, type WastageReason } from "@/lib/mock-data";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
@@ -52,12 +52,13 @@ function WastagePage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const { data: wastages = [] } = useQuery({ queryKey: ["wastage"], queryFn: api.listWastage });
+  const { data: products = [], isLoading: productsLoading } = useQuery({ queryKey: ["products"], queryFn: api.listProducts });
 
   const { register, handleSubmit, watch, setValue, reset, formState: { errors, isSubmitting } } =
     useForm<FormVals>({ resolver: zodResolver(schema), defaultValues: { qty: 1, reason: "Expired", loss: 0 } });
 
   const productId = watch("productId");
-  const product = PRODUCTS.find(p => p.id === productId);
+  const product = products.find((p: any) => p.id === productId);
 
   const create = useMutation({
     mutationFn: async (v: FormVals) => api.createWastage({
@@ -112,7 +113,8 @@ function WastagePage() {
                   }}>
                     <SelectTrigger><SelectValue placeholder="Select product…" /></SelectTrigger>
                     <SelectContent>
-                      {PRODUCTS.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                      {productsLoading && <SelectItem value="">Loading…</SelectItem>}
+                      {products.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   {errors.productId && <p className="text-xs text-destructive">{errors.productId.message}</p>}
@@ -215,7 +217,7 @@ function WastagePage() {
               {wastages.slice(0, 8).map(w => (
                 <TableRow key={w.id}>
                   <TableCell className="text-muted-foreground">{w.date}</TableCell>
-                  <TableCell className="font-medium">{productName(w.productId)}</TableCell>
+                  <TableCell className="font-medium">{products.find((p: any) => p.id === w.productId)?.name ?? mockProductName(w.productId)}</TableCell>
                   <TableCell><Badge variant="secondary" className="bg-muted">{w.reason}</Badge></TableCell>
                   <TableCell className="text-right">{w.qty}</TableCell>
                   <TableCell className="text-right text-destructive font-medium">{currency(w.loss)}</TableCell>

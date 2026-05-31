@@ -283,3 +283,4 @@ APP_SETTINGS = {
     'CURRENCY': 'INR',
     'CURRENCY_SYMBOL': '₹',
 }
+AUTH_USER_MODEL = 'accounts.User'

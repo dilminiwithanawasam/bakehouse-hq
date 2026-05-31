@@ -209,6 +209,24 @@ class WastageAnalytics:
     """Detailed wastage analytics."""
 
     @staticmethod
+    def get_wastage_breakdown(start_date=None, end_date=None):
+        """Get wastage breakdown by reason."""
+        queryset = Wastage.objects.all()
+        
+        if start_date:
+            queryset = queryset.filter(date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(date__lte=end_date)
+        
+        breakdown = queryset.values('reason').annotate(
+            count=Count('id'),
+            total_quantity=Sum('quantity'),
+            total_loss=Sum('loss'),
+        ).order_by('-total_loss')
+        
+        return list(breakdown)
+
+    @staticmethod
     def get_wastage_trend(start_date, end_date):
         """Get wastage trend by date."""
         wastage = Wastage.objects.filter(

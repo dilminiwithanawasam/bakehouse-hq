@@ -173,6 +173,39 @@ export const getWastageReport = async (
   return response.data.data;
 };
 
+// ============================================================
+// USERS API
+// ============================================================
+
+export const listUsers = async (filters?: { role?: string; status?: string }) => {
+  const params = new URLSearchParams();
+  if (filters?.role) params.append("role", filters.role);
+  if (filters?.status) params.append("status", filters.status);
+
+  const response = await apiClient.get("/users/", { params });
+  return response.data.results || response.data.data || [];
+};
+
+export const createUser = async (payload: { name: string; email: string; role: string; password?: string }) => {
+  const response = await apiClient.post("/users/", payload);
+  return response.data.data;
+};
+
+export const updateUser = async (id: string | number, payload: Record<string, any>) => {
+  const response = await apiClient.put(`/users/${id}/`, payload);
+  return response.data.data;
+};
+
+export const toggleUserStatus = async (id: string | number) => {
+  const response = await apiClient.post(`/users/${id}/toggle_status/`);
+  return response.data.data;
+};
+
+export const resetUserPassword = async (id: string | number) => {
+  const response = await apiClient.post(`/users/${id}/reset_password/`);
+  return response.data;
+};
+
 export default {
   listSales,
   createSale,

@@ -75,7 +75,7 @@ function StockPage() {
           <Select value={cat} onValueChange={setCat}>
             <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {categories.map(c => <SelectItem key={c} value={c}>{c === "all" ? "All categories" : c}</SelectItem>)}
+              {categories?.filter(c => c && typeof c === 'string').map(c => <SelectItem key={c} value={c}>{c === "all" ? "All categories" : c}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>

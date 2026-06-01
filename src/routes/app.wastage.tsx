@@ -63,10 +63,21 @@ function WastagePage() {
   const create = useMutation({
     mutationFn: async (v: FormVals) => api.createWastage({
       date: new Date().toISOString().slice(0, 10),
-      productId: v.productId, qty: v.qty, reason: v.reason, loss: v.loss,
-      notes: v.notes, recordedBy: user?.name ?? "Unknown",
+      productId: v.productId,
+      qty: v.qty,
+      reason: v.reason,
+      loss: v.loss,
+      notes: v.notes,
     }),
-    onSuccess: () => { toast.success("Wastage recorded"); reset(); setOpen(false); qc.invalidateQueries({ queryKey: ["wastage"] }); },
+    onSuccess: () => {
+      toast.success("Wastage recorded");
+      reset();
+      setOpen(false);
+      qc.invalidateQueries({ queryKey: ["wastage"] });
+    },
+    onError: (error: Error) => {
+      toast.error(error?.message || "Failed to record wastage");
+    },
   });
 
   const totalLoss = wastages.reduce((s, w) => s + w.loss, 0);
@@ -108,8 +119,8 @@ function WastagePage() {
                   <Label>Product</Label>
                   <Select value={productId} onValueChange={(v) => {
                     setValue("productId", v);
-                    const p = PRODUCTS.find(pp => pp.id === v);
-                    if (p) setValue("loss", p.price);
+                    const p = products.find(pp => pp.id === v);
+                    if (p) setValue("loss", p?.price ?? 0);
                   }}>
                     <SelectTrigger><SelectValue placeholder="Select product…" /></SelectTrigger>
                     <SelectContent>

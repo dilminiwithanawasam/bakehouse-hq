@@ -43,7 +43,13 @@ function StockPage() {
 
   const updateStock = useMutation({
     mutationFn: ({ id, stock }: { id: string; stock: number }) => api.updateStock(id, stock),
-    onSuccess: () => { toast.success("Stock updated"); qc.invalidateQueries({ queryKey: ["products"] }); },
+    onSuccess: () => {
+      toast.success("Stock updated");
+      qc.invalidateQueries({ queryKey: ["products"] });
+    },
+    onError: (error: Error) => {
+      toast.error(error?.message || "Failed to update stock");
+    },
   });
 
   const lowCount = products.filter(p => p.stock <= p.minStock).length;
@@ -114,8 +120,12 @@ function StockPage() {
                   </TableCell>
                   <TableCell><Badge variant="secondary" className={`${s.className} border-0`}>{s.label}</Badge></TableCell>
                   <TableCell className="text-right">
-                    <Button size="sm" variant="outline" disabled={c == null}
-                      onClick={() => updateStock.mutate({ id: p.id, stock: c! })}>
+                    <Button size="sm" variant="outline" disabled={c === null || c === undefined}
+                      onClick={() => {
+                        if (c !== null && c !== undefined) {
+                          updateStock.mutate({ id: p.id, stock: c });
+                        }
+                      }}>
                       Save
                     </Button>
                   </TableCell>

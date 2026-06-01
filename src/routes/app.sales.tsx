@@ -69,7 +69,9 @@ function SalesPage() {
       setItems([]);
       qc.invalidateQueries({ queryKey: ["sales"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      toast.error(e?.message || "Failed to save sale");
+    },
   });
 
   return (

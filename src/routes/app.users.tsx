@@ -63,15 +63,48 @@ function UsersPage() {
   };
 
   const createUserMut = useMutation({
-    mutationFn: (payload: any) => api.createUser(payload),
-    onSuccess: () => { toast.success("User created"); qc.invalidateQueries(["users"]); setOpen(false); },
-    onError: (e: any) => toast.error(e?.message || "Create failed"),
+    mutationFn: (payload: FormVals) => api.createUser(payload),
+    onSuccess: () => {
+      toast.success("User created");
+      qc.invalidateQueries({ queryKey: ["users"] });
+      setOpen(false);
+    },
+    onError: (error: Error) => {
+      toast.error(error?.message || "Failed to create user");
+    },
   });
 
   const updateUserMut = useMutation({
-    mutationFn: ({ id, payload }: any) => api.updateUser(id, payload),
-    onSuccess: () => { toast.success("User updated"); qc.invalidateQueries(["users"]); setOpen(false); },
-    onError: (e: any) => toast.error(e?.message || "Update failed"),
+    mutationFn: ({ id, payload }: { id: string | number; payload: FormVals }) => api.updateUser(id, payload),
+    onSuccess: () => {
+      toast.success("User updated");
+      qc.invalidateQueries({ queryKey: ["users"] });
+      setOpen(false);
+    },
+    onError: (error: Error) => {
+      toast.error(error?.message || "Failed to update user");
+    },
+  });
+
+  const toggleStatusMut = useMutation({
+    mutationFn: (id: string | number) => api.toggleUserStatus(id),
+    onSuccess: () => {
+      toast.success("User status updated");
+      qc.invalidateQueries({ queryKey: ["users"] });
+    },
+    onError: (error: Error) => {
+      toast.error(error?.message || "Failed to toggle user status");
+    },
+  });
+
+  const resetPasswordMut = useMutation({
+    mutationFn: (id: string | number) => api.resetUserPassword(id),
+    onSuccess: () => {
+      toast.success("Password reset email sent");
+    },
+    onError: (error: Error) => {
+      toast.error(error?.message || "Failed to reset password");
+    },
   });
 
   const onSubmit = (v: FormVals) => {
@@ -83,11 +116,11 @@ function UsersPage() {
   };
 
   const toggleStatus = (u: User) => {
-    api.toggleUserStatus(u.id).then(() => { toast.success("Status updated"); qc.invalidateQueries(["users"]); }).catch((e) => toast.error(e?.message || "Failed"));
+    toggleStatusMut.mutate(u.id);
   };
 
   const resetPassword = (u: User) => {
-    api.resetUserPassword(u.id).then(() => toast.success("Reset email sent")).catch((e) => toast.error(e?.message || "Failed"));
+    resetPasswordMut.mutate(u.id);
   };
 
   const filtered = (users as User[]).filter(u =>
@@ -186,7 +219,7 @@ function UsersPage() {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-              <Button type="submit">{editing ? "Save" : "Create"}</Button>
+              <Button type="submit" disabled={createUserMut.isPending || updateUserMut.isPending}>{editing ? "Save" : "Create"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>

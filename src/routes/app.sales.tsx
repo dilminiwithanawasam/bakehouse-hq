@@ -86,14 +86,14 @@ function SalesPage() {
                   <SelectTrigger><SelectValue placeholder="Select a bakery item…" /></SelectTrigger>
                   <SelectContent>
                     {productsLoading && (
-                      <SelectItem value="">Loading…</SelectItem>
+                      <SelectItem value="__loading__">Loading…</SelectItem>
                     )}
-                    {products.map((p: any) => (
-                      <SelectItem key={p.id} value={p.id}>
+                    {products?.filter(p => p?.id).map((p: any) => (
+                      <SelectItem key={p.id} value={String(p.id)}>
                         {p.name} <span className="text-muted-foreground">· {currency(p.price)}</span>
                       </SelectItem>
                     ))}
-                    {productsError && <SelectItem value="">Failed to load</SelectItem>}
+                    {productsError && <SelectItem value="__error__">Failed to load</SelectItem>}
                   </SelectContent>
                 </Select>
               </div>

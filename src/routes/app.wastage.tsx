@@ -81,7 +81,10 @@ function WastagePage() {
   const byProduct = useMemo(() => {
     const map = new Map<string, number>();
     wastages.forEach(w => map.set(w.productId, (map.get(w.productId) ?? 0) + w.qty));
-    return Array.from(map.entries()).map(([id, qty]) => ({ name: productName(id), qty }))
+    return Array.from(map.entries()).map(([id, qty]) => {
+      const prod = products.find((p: any) => p.id === id);
+      return { name: prod?.name ?? `Product ${id}`, qty };
+    })
       .sort((a, b) => b.qty - a.qty).slice(0, 6);
   }, [wastages]);
 
@@ -108,13 +111,13 @@ function WastagePage() {
                   <Label>Product</Label>
                   <Select value={productId} onValueChange={(v) => {
                     setValue("productId", v);
-                    const p = PRODUCTS.find(pp => pp.id === v);
+                    const p = products.find((pp: any) => pp.id === v);
                     if (p) setValue("loss", p.price);
                   }}>
                     <SelectTrigger><SelectValue placeholder="Select product…" /></SelectTrigger>
                     <SelectContent>
-                      {productsLoading && <SelectItem value="">Loading…</SelectItem>}
-                      {products.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                      {productsLoading && <SelectItem value="__loading__">Loading…</SelectItem>}
+                      {products?.filter(p => p?.id).map((p: any) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   {errors.productId && <p className="text-xs text-destructive">{errors.productId.message}</p>}

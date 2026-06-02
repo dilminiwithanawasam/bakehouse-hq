@@ -23,6 +23,21 @@ import { currency } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/app/dashboard")({ component: DashboardPage });
 
+type DashboardProductSalesItem = {
+  id: string | number;
+  name: string;
+  qty: number;
+  revenue: number;
+};
+
+type DashboardLowStockItem = {
+  id: string | number;
+  name: string;
+  stock: number;
+  minStock: number;
+  category?: string | null;
+};
+
 const PIE_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
 
 function DashboardPage() {
@@ -45,7 +60,7 @@ function ExecutiveDashboard() {
   const outOfStockCount = data?.today_stats?.stock?.out_of_stock_count ?? 0;
 
   // Map list data from API response with proper property extraction
-  const lowStock = data?.low_stock_alerts?.map((item: any) => ({
+  const lowStock: DashboardLowStockItem[] = data?.low_stock_alerts?.map((item: any) => ({
     id: item?.id,
     name: item?.name,
     stock: item?.stock ?? 0,
@@ -53,7 +68,7 @@ function ExecutiveDashboard() {
     category: item?.category__name,
   })) ?? [];
 
-  const productSales = data?.top_products?.map((p: any) => ({
+  const productSales: DashboardProductSalesItem[] = data?.top_products?.map((p: any) => ({
     id: p?.product__id,
     name: p?.product__name,
     qty: p?.total_qty ?? 0,
@@ -223,7 +238,7 @@ function SalespersonDashboard() {
   const lowStockCount = data?.today_stats?.stock?.low_stock_count ?? 0;
   const outOfStockCount = data?.today_stats?.stock?.out_of_stock_count ?? 0;
 
-  const productSales = data?.top_products?.map((p: any) => ({
+  const productSales: DashboardProductSalesItem[] = data?.top_products?.map((p: any) => ({
     id: p?.product__id,
     name: p?.product__name,
     qty: p?.total_qty ?? 0,

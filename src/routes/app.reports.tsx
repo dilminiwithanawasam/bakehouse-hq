@@ -51,7 +51,43 @@ function ReportsPage() {
 
   const productRanking = topProducts.map((p: any) => ({ name: p.name, sold: p.sold, wasted: wastageByProduct[p.id] || 0 })).slice(0, 8);
 
-  const download = (kind: string) => toast.success(`${kind} download queued`);
+  const download = async (kind: string) => {
+    try {
+      if (kind === "CSV") {
+        const rows = (salesReport?.by_date || []).map((d: any) => ({
+          date: d.date,
+          revenue: d.total_revenue || d.total || 0,
+          orders: d.transaction_count || d.transaction_count || 0,
+        }));
+        const header = ["date", "revenue", "orders"];
+        const csv = [header.join(",")].concat(rows.map((r: any) => [r.date, r.revenue, r.orders].join(","))).join("\n");
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `sales-report-${from || "all"}-${to || "all"}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        toast.success("CSV download ready");
+        return;
+      }
+
+      const pdfBlob = await api.getSalesReportPdf(from || undefined, to || undefined);
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `sales-report-${from || "all"}-${to || "all"}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success("PDF download ready");
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to prepare download");
+    }
+  };
 
   return (
     <>

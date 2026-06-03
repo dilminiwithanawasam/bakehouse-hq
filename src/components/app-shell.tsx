@@ -2,7 +2,7 @@ import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 import {
   LayoutDashboard, ShoppingCart, Trash2, Boxes, BarChart3,
-  Users, Settings, LogOut, Menu, Bell, Croissant, X,
+  Users, Settings, LogOut, Menu, Croissant, X,
 } from "lucide-react";
 import { useAuth, ROLE_LABEL } from "@/lib/auth";
 import type { Role } from "@/lib/mock-data";
@@ -52,7 +52,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-foreground/40" onClick={() => setMobileOpen(false)} />
           <aside className="relative w-64 bg-sidebar flex flex-col">
-            <button className="absolute top-3 right-3 p-1" onClick={() => setMobileOpen(false)}>
+            <button className="absolute top-3 right-3 p-1" onClick={() => setMobileOpen(false)} aria-label="Close navigation menu">
               <X className="h-5 w-5" />
             </button>
             <SidebarContent items={items} pathname={pathname} onNavigate={() => setMobileOpen(false)} />
@@ -63,23 +63,18 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top nav */}
         <header className="sticky top-0 z-30 h-16 border-b bg-background/80 backdrop-blur flex items-center px-4 sm:px-6 gap-3">
-          <button className="lg:hidden p-2 -ml-2" onClick={() => setMobileOpen(true)}>
+          <button className="lg:hidden p-2 -ml-2" onClick={() => setMobileOpen(true)} aria-label="Open navigation menu">
             <Menu className="h-5 w-5" />
           </button>
           <div className="flex flex-col">
-            <span className="text-sm font-medium">Sunrise Bakery — Bandra Outlet</span>
-            <span className="text-xs text-muted-foreground">{today}</span>
+            <span className="text-sm font-medium">Sunrise Bakery — Colombo Outlet</span>
+            <time className="text-xs text-muted-foreground">{today}</time>
           </div>
 
           <div className="ml-auto flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-destructive" />
-            </Button>
-
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg hover:bg-muted transition">
+                <button className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg hover:bg-muted transition" aria-label="User menu">
                   <Avatar className="h-8 w-8">
                     <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
                       {initials}

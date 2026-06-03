@@ -161,6 +161,22 @@ export const getSalesReport = async (
   return response.data.data;
 };
 
+export const getSalesReportPdf = async (
+  startDate?: string,
+  endDate?: string
+) => {
+  const params = new URLSearchParams();
+  if (startDate) params.append("start_date", startDate);
+  if (endDate) params.append("end_date", endDate);
+
+  const response = await apiClient.get("/reports/sales/pdf/", {
+    params,
+    responseType: "blob",
+  });
+
+  return response.data;
+};
+
 export const getWastageReport = async (
   startDate?: string,
   endDate?: string
@@ -206,6 +222,20 @@ export const resetUserPassword = async (id: string | number) => {
   return response.data;
 };
 
+export const saveOutletSettings = async (settings: { outlet: string; currency: string }) => {
+  // Store settings locally since backend doesn't have settings API yet
+  // This persists through refresh via localStorage
+  try {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("bakery_outlet", settings.outlet);
+      localStorage.setItem("bakery_currency", settings.currency);
+    }
+  } catch (e) {
+    // ignore
+  }
+  return { success: true };
+};
+
 export default {
   listSales,
   createSale,
@@ -215,5 +245,8 @@ export default {
   updateStock,
   getDashboardData,
   getSalesReport,
+  getSalesReportPdf,
   getWastageReport,
+  saveOutletSettings,
+  resetUserPassword,
 };

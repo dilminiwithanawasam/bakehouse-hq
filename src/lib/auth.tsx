@@ -47,7 +47,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             try {
               const newToken = await refreshTokenFn(parsed.refresh);
               if (newToken) {
+                setUser(parsed.user);
                 setToken(newToken);
+                axios.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
+                localStorage.setItem(
+                  STORAGE_KEY,
+                  JSON.stringify({
+                    ...parsed,
+                    access: newToken,
+                    exp: Date.now() + 8 * 60 * 60 * 1000,
+                  })
+                );
               } else {
                 localStorage.removeItem(STORAGE_KEY);
               }
@@ -160,6 +170,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!newToken) throw new Error("Token refresh failed");
 
     setToken(newToken);
+    const parsed = JSON.parse(stored) as {
+      access: string;
+      refresh: string;
+      user: User;
+      exp: number;
+    };
+    const updated = {
+      ...parsed,
+      access: newToken,
+      exp: Date.now() + 8 * 60 * 60 * 1000,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     axios.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
     return newToken;
   };

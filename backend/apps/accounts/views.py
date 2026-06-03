@@ -6,7 +6,8 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework.exceptions import ValidationError
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView as SimpleJWTTokenRefreshView
 from django.contrib.auth import authenticate
 from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -33,23 +34,41 @@ class BakeryTokenObtainPairView(TokenObtainPairView):
     permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
-        """Override to update last_login on successful authentication."""
-        response = super().post(request, *args, **kwargs)
-        
-        if response.status_code == 200:
-            # Update last login
-            email = request.data.get('email')
-            try:
-                user = User.objects.get(email=email)
-                user.last_login = timezone.now()
-                user.update_last_login_display()
-            except User.DoesNotExist:
-                pass
-        
-        return response
+        """Override to wrap auth responses and return consistent error codes."""
+        serializer = self.get_serializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except ValidationError as exc:
+            return Response(
+                {
+                    'success': False,
+                    'error': {
+                        'message': str(exc.detail),
+                        'code': 'authentication_failed',
+                    },
+                },
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        data = serializer.validated_data
+        email = request.data.get('email')
+        try:
+            user = User.objects.get(email=email)
+            user.last_login = timezone.now()
+            user.update_last_login_display()
+        except User.DoesNotExist:
+            pass
+
+        return Response(
+            {
+                'success': True,
+                'data': data,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
-class TokenRefreshView(TokenRefreshView):
+class BakeryTokenRefreshView(SimpleJWTTokenRefreshView):
     """
     Refresh JWT access token.
     
@@ -58,7 +77,16 @@ class TokenRefreshView(TokenRefreshView):
         "refresh": "refresh_token"
     }
     """
-    pass
+
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        return Response(
+            {
+                'success': True,
+                'data': response.data,
+            },
+            status=response.status_code,
+        )
 
 
 @api_view(['POST'])

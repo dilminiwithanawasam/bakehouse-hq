@@ -62,7 +62,9 @@ class WastageCreateSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        """Create wastage record."""
+        """Create wastage record and decrement product stock."""
+        from apps.products.models import StockAdjustment
+        
         validated_data['recorded_by'] = self.context['request'].user
         
         # Calculate loss
@@ -70,7 +72,26 @@ class WastageCreateSerializer(serializers.ModelSerializer):
         unit_cost = validated_data.get('unit_cost', 0)
         validated_data['loss'] = Decimal(quantity) * Decimal(unit_cost)
         
+        # Create wastage record
         wastage = Wastage.objects.create(**validated_data)
+        
+        # Adjust stock
+        product = validated_data['product']
+        product.stock -= quantity
+        product.total_wasted += quantity
+        product.save()
+        
+        # Log adjustment
+        StockAdjustment.objects.create(
+            product=product,
+            quantity=-quantity,
+            reason='wastage',
+            old_stock=product.stock + quantity,
+            new_stock=product.stock,
+            wastage=wastage,
+            adjusted_by=self.context['request'].user,
+        )
+        
         return wastage
 
 

@@ -1,5 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import {
@@ -47,6 +46,7 @@ function DashboardPage() {
 }
 
 function ExecutiveDashboard() {
+  const router = useRouter();
   const { data: response } = useQuery({ queryKey: ["dashboard"], queryFn: api.getDashboardData });
 
   // Safely extract data from the API response wrapper
@@ -98,7 +98,19 @@ function ExecutiveDashboard() {
                 <TabsTrigger value="month">Month</TabsTrigger>
               </TabsList>
             </Tabs>
-            <Button variant="outline" size="sm"><Download className="h-4 w-4 mr-2" />Export</Button>
+            <Button variant="outline" size="sm" onClick={() => {
+              try {
+                // Build CSV from top products
+                const rows = productSales.map(p => [p.name, p.qty, p.revenue]);
+                const header = ["product", "qty", "revenue"];
+                const csv = [header.join(",")].concat(rows.map(r => r.join(","))).join("\n");
+                const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url; a.download = `dashboard-top-products.csv`;
+                document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+              } catch (e) { /* ignore */ }
+            }}><Download className="h-4 w-4 mr-2" />Export</Button>
           </>
         }
       />
@@ -186,7 +198,7 @@ function ExecutiveDashboard() {
         <Card className="rounded-xl p-5 lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold">Top selling products</h3>
-            <Button variant="ghost" size="sm">View all</Button>
+            <Button variant="ghost" size="sm" onClick={() => router.navigate({ to: "/app/reports" })}>View all</Button>
           </div>
           <div className="space-y-2">
             {productSales.slice(0, 6).map((p) => (

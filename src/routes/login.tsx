@@ -65,7 +65,7 @@ function LoginPage() {
           </p>
           <div className="grid grid-cols-3 gap-3 pt-6">
             {[
-              { k: "₹1.2L", v: "Sales today" },
+              { k: "LKR 1.2M", v: "Sales today" },
               { k: "382", v: "Items sold" },
               { k: "2.1%", v: "Wastage" },
             ].map((s) => (

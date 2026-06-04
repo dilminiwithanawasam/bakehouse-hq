@@ -1,20 +1,46 @@
 /**
- * Updated API Service Layer
- *
- * Replace src/lib/api.ts with this implementation
- * that connects to the Django backend
+ * Updated API Service Layer with Automated Token Interceptor
+ * PERSISTENCE SCHEMA: Django REST Framework + Simple JWT Auth Integration
+ * file: src/lib/api-backend.ts
  */
 
 import axios from "axios";
 
+// Base API connection gateway location
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
 
+// Master security file key location inside the browser browser database
+const STORAGE_KEY = import.meta.env.VITE_JWT_STORAGE_KEY || "bakery_auth_v2";
+
+// Initialize our isolated custom network transmitter tool
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
 });
+
+/**
+ * REQUEST INTERCEPTOR PIPELINE
+ * Intercepts outbound requests and attaches the JWT authorization headers
+ */
+apiClient.interceptors.request.use(
+  (config) => {
+    const storedAuth = localStorage.getItem(STORAGE_KEY);
+    if (storedAuth) {
+      try {
+        const parsedAuth = JSON.parse(storedAuth);
+        if (parsedAuth && parsedAuth.access) {
+          config.headers["Authorization"] = `Bearer ${parsedAuth.access}`;
+        }
+      } catch (error) {
+        console.error("Interceptor failed to attach secure authentication headers:", error);
+      }
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 export interface ApiError {
   success: boolean;
@@ -27,7 +53,7 @@ export interface ApiError {
 export interface Product {
   id: string;
   name: string;
-  category: string;
+  category: string | number;
   category_name?: string;
   cost_price?: number;
   price: number;
@@ -40,11 +66,13 @@ export interface Product {
   description?: string;
   image_url?: string;
   is_active: boolean;
+  shelf_life_days?: number;
 }
 
 export interface ProductBatch {
   id: string;
-  product: string;
+  product: string | number;
+  product_name?: string;
   batch_number: string;
   production_date?: string;
   expiry_date?: string;
@@ -114,6 +142,13 @@ export interface Wastage {
   created_at: string;
 }
 
+// Helper function to safely handle both direct JSON arrays or enveloped backend data payloads
+const parseResponseData = (response: any) => {
+  if (!response || !response.data) return [];
+  if (Array.isArray(response.data)) return response.data;
+  return response.data.results || response.data.data || [];
+};
+
 // ============================================================
 // SALES API
 // ============================================================
@@ -129,7 +164,7 @@ export const listSales = async (filters?: {
   if (filters?.cashier) params.append("cashier", filters.cashier);
 
   const response = await apiClient.get("/sales/", { params });
-  return response.data.results || response.data.data || [];
+  return parseResponseData(response);
 };
 
 export const createSale = async (data: {
@@ -142,8 +177,8 @@ export const createSale = async (data: {
   const payload = {
     date: data.date,
     items: data.items.map((item) => ({
-      product: item.productId,
-      batch: item.batchId,
+      product: Number(item.productId),
+      batch: item.batchId && item.batchId !== "" ? Number(item.batchId) : null, // Sanitizes types for Django Serializers
       quantity: item.qty,
       unit_price: item.unitPrice,
       discount_amount: item.discountAmount || 0,
@@ -154,7 +189,7 @@ export const createSale = async (data: {
   };
 
   const response = await apiClient.post("/sales/", payload);
-  return response.data.data;
+  return response.data.data || response.data;
 };
 
 // ============================================================
@@ -170,7 +205,7 @@ export const listWastage = async (filters?: {
   if (filters?.end_date) params.append("date__lte", filters.end_date);
 
   const response = await apiClient.get("/wastage/", { params });
-  return response.data.results || response.data.data || [];
+  return parseResponseData(response);
 };
 
 export const createWastage = async (data: WastagePayload): Promise<Wastage> => {
@@ -185,7 +220,7 @@ export const createWastage = async (data: WastagePayload): Promise<Wastage> => {
   };
 
   const response = await apiClient.post("/wastage/", payload);
-  return response.data.data;
+  return response.data.data || response.data;
 };
 
 // ============================================================
@@ -197,7 +232,13 @@ export const listProducts = async (filters?: { category?: string }): Promise<Pro
   if (filters?.category) params.append("category", filters.category);
 
   const response = await apiClient.get("/products/", { params });
-  return response.data.results || response.data.data || [];
+  return parseResponseData(response);
+};
+
+// 🌟 ADDED MISSING EXPORT: createProduct
+export const createProduct = async (payload: any): Promise<Product> => {
+  const response = await apiClient.post("/products/", payload);
+  return response.data.data || response.data;
 };
 
 export const listBatches = async (filters?: { product?: string }): Promise<ProductBatch[]> => {
@@ -205,7 +246,13 @@ export const listBatches = async (filters?: { product?: string }): Promise<Produ
   if (filters?.product) params.append("product", filters.product);
 
   const response = await apiClient.get("/products/batches/", { params });
-  return response.data.results || response.data.data || [];
+  return parseResponseData(response);
+};
+
+// 🌟 ADDED MISSING EXPORT: createBatch
+export const createBatch = async (payload: any): Promise<ProductBatch> => {
+  const response = await apiClient.post("/products/batches/", payload);
+  return response.data.data || response.data;
 };
 
 export const updateStock = async (id: string, newStock: number): Promise<Product> => {
@@ -213,7 +260,7 @@ export const updateStock = async (id: string, newStock: number): Promise<Product
     stock: newStock,
     reason: "manual_adjustment",
   });
-  return response.data.data;
+  return response.data.data || response.data;
 };
 
 // ============================================================
@@ -222,7 +269,7 @@ export const updateStock = async (id: string, newStock: number): Promise<Product
 
 export const getDashboardData = async () => {
   const response = await apiClient.get("/reports/dashboard/");
-  return response.data.data;
+  return response.data.data || response.data;
 };
 
 // ============================================================
@@ -235,7 +282,7 @@ export const getSalesReport = async (startDate?: string, endDate?: string) => {
   if (endDate) params.append("end_date", endDate);
 
   const response = await apiClient.get("/reports/sales/", { params });
-  return response.data.data;
+  return response.data.data || response.data;
 };
 
 export const getSalesReportPdf = async (startDate?: string, endDate?: string) => {
@@ -247,7 +294,6 @@ export const getSalesReportPdf = async (startDate?: string, endDate?: string) =>
     params,
     responseType: "blob",
   });
-
   return response.data;
 };
 
@@ -257,7 +303,7 @@ export const getWastageReport = async (startDate?: string, endDate?: string) => 
   if (endDate) params.append("end_date", endDate);
 
   const response = await apiClient.get("/reports/wastage/", { params });
-  return response.data.data;
+  return response.data.data || response.data;
 };
 
 // ============================================================
@@ -270,7 +316,7 @@ export const listUsers = async (filters?: { role?: string; status?: string }) =>
   if (filters?.status) params.append("status", filters.status);
 
   const response = await apiClient.get("/users/", { params });
-  return response.data.results || response.data.data || [];
+  return parseResponseData(response);
 };
 
 export const createUser = async (payload: {
@@ -280,7 +326,7 @@ export const createUser = async (payload: {
   password?: string;
 }) => {
   const response = await apiClient.post("/users/", payload);
-  return response.data.data;
+  return response.data.data || response.data;
 };
 
 export const registerCustomer = async (payload: {
@@ -291,17 +337,17 @@ export const registerCustomer = async (payload: {
   phone?: string;
 }) => {
   const response = await apiClient.post("/auth/register/", payload);
-  return response.data.data;
+  return response.data.data || response.data;
 };
 
 export const updateUser = async (id: string | number, payload: Record<string, unknown>) => {
   const response = await apiClient.put(`/users/${id}/`, payload);
-  return response.data.data;
+  return response.data.data || response.data;
 };
 
 export const toggleUserStatus = async (id: string | number) => {
   const response = await apiClient.post(`/users/${id}/toggle_status/`);
-  return response.data.data;
+  return response.data.data || response.data;
 };
 
 export const resetUserPassword = async (id: string | number) => {
@@ -310,8 +356,6 @@ export const resetUserPassword = async (id: string | number) => {
 };
 
 export const saveOutletSettings = async (settings: { outlet: string; currency: string }) => {
-  // Store settings locally since backend doesn't have settings API yet
-  // This persists through refresh via localStorage
   try {
     if (typeof window !== "undefined") {
       localStorage.setItem("bakery_outlet", settings.outlet);
@@ -323,8 +367,6 @@ export const saveOutletSettings = async (settings: { outlet: string; currency: s
   return { success: true };
 };
 
-// default export will be defined after all functions are declared
-
 // ============================================================
 // ORDERS / PAYMENTS / OUTLETS / DISPATCH API
 // ============================================================
@@ -334,66 +376,68 @@ export const listOrders = async (filters?: { status?: string; customer?: string 
   if (filters?.status) params.append("status", filters.status);
   if (filters?.customer) params.append("customer", filters.customer);
   const response = await apiClient.get("/sales/orders/", { params });
-  return response.data.results || response.data.data || [];
+  return parseResponseData(response);
 };
 
 export const createOrder = async (payload: unknown) => {
   const response = await apiClient.post("/sales/orders/", payload);
-  return response.data.data;
+  return response.data.data || response.data;
 };
 
 export const getOrder = async (id: string | number) => {
   const response = await apiClient.get(`/sales/orders/${id}/`);
-  return response.data.data;
+  return response.data.data || response.data;
 };
 
 export const listPayments = async (filters?: { order?: string }) => {
   const params = new URLSearchParams();
   if (filters?.order) params.append("order", filters.order);
   const response = await apiClient.get("/sales/payments/", { params });
-  return response.data.results || response.data.data || [];
+  return parseResponseData(response);
 };
 
 export const createPayment = async (payload: unknown) => {
   const response = await apiClient.post("/sales/payments/", payload);
-  return response.data.data;
+  return response.data.data || response.data;
 };
 
 export const listOutlets = async () => {
   const response = await apiClient.get("/products/outlets/");
-  return response.data.results || response.data.data || [];
+  return parseResponseData(response);
 };
 
 export const listDispatchRequests = async (filters?: { status?: string }) => {
   const params = new URLSearchParams();
   if (filters?.status) params.append("status", filters.status);
   const response = await apiClient.get("/products/dispatch_requests/", { params });
-  return response.data.results || response.data.data || [];
+  return parseResponseData(response);
 };
 
 export const createDispatchRequest = async (payload: unknown) => {
   const response = await apiClient.post("/products/dispatch_requests/", payload);
-  return response.data.data;
+  return response.data.data || response.data;
 };
 
 export const approveDispatchRequest = async (id: string | number) => {
   const response = await apiClient.post(`/products/dispatch_requests/${id}/approve/`);
-  return response.data.data;
+  return response.data.data || response.data;
 };
 
 export const createDispatch = async (payload: unknown) => {
   const response = await apiClient.post("/products/dispatches/", payload);
-  return response.data.data;
+  return response.data.data || response.data;
 };
 
-// Provide a single ESM default export that aggregates all helpers for backward compatibility
+// 🌟 Default Export aggregation object updated with missing references
 export default {
   listSales,
   createSale,
   listWastage,
   createWastage,
   listProducts,
+  createProduct,
   listBatches,
+  createBatch,
   updateStock,
   getDashboardData,
   getSalesReport,

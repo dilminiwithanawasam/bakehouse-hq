@@ -22,6 +22,7 @@ import { Route as AppStockRouteImport } from './routes/app.stock'
 import { Route as AppSettingsRouteImport } from './routes/app.settings'
 import { Route as AppSalesRouteImport } from './routes/app.sales'
 import { Route as AppReportsRouteImport } from './routes/app.reports'
+import { Route as AppProductsRouteImport } from './routes/app.products'
 import { Route as AppPaymentsRouteImport } from './routes/app.payments'
 import { Route as AppOutletsRouteImport } from './routes/app.outlets'
 import { Route as AppOrdersRouteImport } from './routes/app.orders'
@@ -92,6 +93,11 @@ const AppReportsRoute = AppReportsRouteImport.update({
   path: '/reports',
   getParentRoute: () => AppRoute,
 } as any)
+const AppProductsRoute = AppProductsRouteImport.update({
+  id: '/products',
+  path: '/products',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppPaymentsRoute = AppPaymentsRouteImport.update({
   id: '/payments',
   path: '/payments',
@@ -124,6 +130,7 @@ export interface FileRoutesByFullPath {
   '/app/orders': typeof AppOrdersRoute
   '/app/outlets': typeof AppOutletsRoute
   '/app/payments': typeof AppPaymentsRoute
+  '/app/products': typeof AppProductsRoute
   '/app/reports': typeof AppReportsRoute
   '/app/sales': typeof AppSalesRoute
   '/app/settings': typeof AppSettingsRoute
@@ -142,6 +149,7 @@ export interface FileRoutesByTo {
   '/app/orders': typeof AppOrdersRoute
   '/app/outlets': typeof AppOutletsRoute
   '/app/payments': typeof AppPaymentsRoute
+  '/app/products': typeof AppProductsRoute
   '/app/reports': typeof AppReportsRoute
   '/app/sales': typeof AppSalesRoute
   '/app/settings': typeof AppSettingsRoute
@@ -162,6 +170,7 @@ export interface FileRoutesById {
   '/app/orders': typeof AppOrdersRoute
   '/app/outlets': typeof AppOutletsRoute
   '/app/payments': typeof AppPaymentsRoute
+  '/app/products': typeof AppProductsRoute
   '/app/reports': typeof AppReportsRoute
   '/app/sales': typeof AppSalesRoute
   '/app/settings': typeof AppSettingsRoute
@@ -183,6 +192,7 @@ export interface FileRouteTypes {
     | '/app/orders'
     | '/app/outlets'
     | '/app/payments'
+    | '/app/products'
     | '/app/reports'
     | '/app/sales'
     | '/app/settings'
@@ -201,6 +211,7 @@ export interface FileRouteTypes {
     | '/app/orders'
     | '/app/outlets'
     | '/app/payments'
+    | '/app/products'
     | '/app/reports'
     | '/app/sales'
     | '/app/settings'
@@ -220,6 +231,7 @@ export interface FileRouteTypes {
     | '/app/orders'
     | '/app/outlets'
     | '/app/payments'
+    | '/app/products'
     | '/app/reports'
     | '/app/sales'
     | '/app/settings'
@@ -331,6 +343,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppReportsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/products': {
+      id: '/app/products'
+      path: '/products'
+      fullPath: '/app/products'
+      preLoaderRoute: typeof AppProductsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/payments': {
       id: '/app/payments'
       path: '/payments'
@@ -367,6 +386,7 @@ interface AppRouteChildren {
   AppOrdersRoute: typeof AppOrdersRoute
   AppOutletsRoute: typeof AppOutletsRoute
   AppPaymentsRoute: typeof AppPaymentsRoute
+  AppProductsRoute: typeof AppProductsRoute
   AppReportsRoute: typeof AppReportsRoute
   AppSalesRoute: typeof AppSalesRoute
   AppSettingsRoute: typeof AppSettingsRoute
@@ -381,6 +401,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppOrdersRoute: AppOrdersRoute,
   AppOutletsRoute: AppOutletsRoute,
   AppPaymentsRoute: AppPaymentsRoute,
+  AppProductsRoute: AppProductsRoute,
   AppReportsRoute: AppReportsRoute,
   AppSalesRoute: AppSalesRoute,
   AppSettingsRoute: AppSettingsRoute,

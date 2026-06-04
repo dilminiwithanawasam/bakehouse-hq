@@ -1,5 +1,6 @@
 """
-URL configuration for sales endpoints.
+URL configurations mapping sales, custom orders, and payments endpoints.
+file: backend/apps/sales/urls.py
 """
 
 from django.urls import path, include

@@ -9,8 +9,8 @@ from apps.products.views import ProductViewSet, ProductCategoryViewSet
 app_name = 'products'
 
 router = DefaultRouter()
-router.register(r'', ProductViewSet, basename='product')
 router.register(r'categories', ProductCategoryViewSet, basename='category')
+router.register(r'', ProductViewSet, basename='product')
 
 urlpatterns = [
     path('', include(router.urls)),

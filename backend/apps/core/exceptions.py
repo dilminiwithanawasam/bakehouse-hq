@@ -64,13 +64,29 @@ def custom_exception_handler(exc, context):
     response = exception_handler(exc, context)
 
     if response is not None:
+        # Check if it is a list or dict of validation errors (without single 'detail' string)
+        if isinstance(response.data, (dict, list)):
+            if isinstance(response.data, dict) and 'detail' in response.data:
+                message = response.data['detail']
+                details = None
+            else:
+                message = 'Validation failed.'
+                details = response.data
+        else:
+            message = 'An error occurred.'
+            details = None
+
+        error_payload = {
+            'message': message,
+            'code': exc.__class__.__name__,
+        }
+        if details is not None:
+            error_payload['details'] = details
+
         # Add consistent error format
         response.data = {
             'success': False,
-            'error': {
-                'message': response.data.get('detail', 'An error occurred.'),
-                'code': exc.__class__.__name__,
-            },
+            'error': error_payload,
             'data': None,
         }
     else:

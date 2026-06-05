@@ -38,7 +38,7 @@ function LoginPage() {
     watch,
   } = useForm<Form>({
     resolver: zodResolver(schema),
-    defaultValues: { email: "manager@bakery.com", password: "demo1234", remember: true },
+    defaultValues: { email: "", password: "demo1234", remember: true },
   });
 
   const onSubmit = async (data: Form) => {
@@ -63,7 +63,7 @@ function LoginPage() {
           <div className="h-10 w-10 rounded-xl bg-white/15 backdrop-blur grid place-items-center">
             <Croissant className="h-5 w-5" />
           </div>
-          <span className="text-lg font-semibold">Sunrise Bakery OS</span>
+          <span className="text-lg font-semibold">BakeryHUB</span>
         </div>
         <div className="relative space-y-4 max-w-md">
           <h1 className="text-4xl font-semibold leading-tight tracking-tight">
@@ -75,9 +75,9 @@ function LoginPage() {
           </p>
           <div className="grid grid-cols-3 gap-3 pt-6">
             {[
-              { k: "LKR 1.2M", v: "Sales today" },
-              { k: "382", v: "Items sold" },
-              { k: "2.1%", v: "Wastage" },
+              { k: "", v: "Sales today" },
+              { k: "", v: "Items sold" },
+              { k: "", v: "Wastage" },
             ].map((s) => (
               <div
                 key={s.v}
@@ -90,7 +90,7 @@ function LoginPage() {
           </div>
         </div>
         <div className="relative text-xs text-primary-foreground/70">
-          © {new Date().getFullYear()} Sunrise Bakery — MVP
+          © {new Date().getFullYear()} BakeryHUB
         </div>
       </div>
 
@@ -133,9 +133,7 @@ function LoginPage() {
                   <p className="text-xs text-destructive">{errors.password.message}</p>
                 )}
                 <div className="text-right">
-                  <Link to="/register" className="text-xs text-primary hover:underline">
-                    Create an account
-                  </Link>
+                  
                 </div>
               </div>
             </div>
@@ -155,7 +153,7 @@ function LoginPage() {
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign in"}
             </Button>
 
-            <div className="rounded-lg bg-muted px-3 py-2.5 text-xs text-muted-foreground space-y-1"></div>
+            
           </form>
         </Card>
       </div>

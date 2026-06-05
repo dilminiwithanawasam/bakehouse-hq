@@ -2,12 +2,17 @@
 Views for reports and analytics.
 """
 
+import io
+
+from django.http import HttpResponse
+from django.utils import timezone
+from datetime import datetime, timedelta
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django.utils import timezone
-from datetime import datetime, timedelta
 
 from apps.reports.analytics import DashboardAnalytics, SalesAnalytics, WastageAnalytics
 from apps.core.permissions import IsManager
@@ -89,6 +94,121 @@ def sales_report_view(request):
             },
             status=status.HTTP_200_OK,
         )
+    except Exception as e:
+        return Response(
+            {
+                'success': False,
+                'error': {'message': str(e)},
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsManager])
+def sales_report_pdf_view(request):
+    """
+    Get PDF sales report.
+
+    GET /api/reports/sales/pdf/?start_date=2024-01-01&end_date=2024-01-31
+    """
+    try:
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+
+        if not start_date:
+            start_date = (timezone.now().date() - timedelta(days=30)).isoformat()
+        if not end_date:
+            end_date = timezone.now().date().isoformat()
+
+        start = datetime.strptime(start_date, '%Y-%m-%d').date()
+        end = datetime.strptime(end_date, '%Y-%m-%d').date()
+
+        analytics = SalesAnalytics()
+        rows = analytics.get_sales_by_date(start, end)
+        payments = analytics.get_sales_by_payment_method(start, end)
+
+        total_revenue = sum(float(item.get('total_revenue') or 0) for item in rows)
+        total_transactions = sum(int(item.get('transaction_count') or 0) for item in rows)
+
+        buffer = io.BytesIO()
+        pdf = canvas.Canvas(buffer, pagesize=A4)
+        width, height = A4
+        margin = 40
+        y = height - margin
+
+        pdf.setFont('Helvetica-Bold', 16)
+        pdf.drawString(margin, y, 'Bakery HQ Sales Report')
+        y -= 24
+
+        pdf.setFont('Helvetica', 10)
+        pdf.drawString(margin, y, f'Period: {start_date} — {end_date}')
+        y -= 16
+        pdf.drawString(margin, y, f'Generated: {timezone.now().strftime("%Y-%m-%d %H:%M")}')
+        y -= 24
+
+        pdf.setFont('Helvetica-Bold', 11)
+        pdf.drawString(margin, y, f'Total revenue: {total_revenue:,.2f}')
+        y -= 16
+        pdf.drawString(margin, y, f'Transactions: {total_transactions}')
+        y -= 24
+
+        pdf.setFont('Helvetica-Bold', 10)
+        pdf.drawString(margin, y, 'Date')
+        pdf.drawString(margin + 170, y, 'Revenue')
+        pdf.drawString(margin + 300, y, 'Transactions')
+        y -= 14
+        pdf.line(margin, y, width - margin, y)
+        y -= 20
+
+        pdf.setFont('Helvetica', 10)
+        for row in rows:
+            if y < 80:
+                pdf.showPage()
+                y = height - margin
+                pdf.setFont('Helvetica', 10)
+
+            row_date = row.get('date')
+            if hasattr(row_date, 'strftime'):
+                row_date = row_date.strftime('%Y-%m-%d')
+            else:
+                row_date = str(row_date)
+
+            pdf.drawString(margin, y, row_date)
+            pdf.drawRightString(margin + 260, y, f'{float(row.get("total_revenue") or 0):,.2f}')
+            pdf.drawRightString(width - margin, y, str(int(row.get('transaction_count') or 0)))
+            y -= 16
+
+        if payments:
+            y -= 28
+            if y < 80:
+                pdf.showPage()
+                y = height - margin
+                pdf.setFont('Helvetica', 10)
+
+            pdf.setFont('Helvetica-Bold', 11)
+            pdf.drawString(margin, y, 'Payment method breakdown')
+            y -= 18
+            pdf.setFont('Helvetica', 10)
+
+            for payment in payments:
+                if y < 80:
+                    pdf.showPage()
+                    y = height - margin
+                    pdf.setFont('Helvetica', 10)
+
+                method = str(payment.get('payment_method') or 'Unknown')
+                pdf.drawString(margin, y, method.capitalize())
+                pdf.drawRightString(width - margin, y, f"{float(payment.get('total_revenue') or 0):,.2f} / {int(payment.get('transaction_count') or 0)} tx")
+                y -= 16
+
+        pdf.showPage()
+        pdf.save()
+        buffer.seek(0)
+
+        response = HttpResponse(buffer.read(), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="sales-report-{start_date}-{end_date}.pdf"'
+        return response
     except Exception as e:
         return Response(
             {

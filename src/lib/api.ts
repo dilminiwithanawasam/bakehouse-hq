@@ -1,6 +1,15 @@
 // Wrapper for backend connected API implementation.
 // Exposes `api` object for existing callsites while also forward-exporting named functions.
 import * as backend from "./api-backend";
+export type {
+  ApiError,
+  Product,
+  ProductBatch,
+  Sale,
+  Wastage,
+  SaleItemPayload,
+  WastagePayload,
+} from "./api-backend";
 
 export const api = {
   listSales: backend.listSales,
@@ -8,15 +17,29 @@ export const api = {
   listWastage: backend.listWastage,
   createWastage: backend.createWastage,
   listProducts: backend.listProducts,
+  listBatches: backend.listBatches,
   updateStock: backend.updateStock,
   getDashboardData: backend.getDashboardData,
   getSalesReport: backend.getSalesReport,
+  getSalesReportPdf: backend.getSalesReportPdf,
   getWastageReport: backend.getWastageReport,
   listUsers: backend.listUsers,
   createUser: backend.createUser,
   updateUser: backend.updateUser,
   toggleUserStatus: backend.toggleUserStatus,
   resetUserPassword: backend.resetUserPassword,
+  saveOutletSettings: backend.saveOutletSettings,
+  registerCustomer: backend.registerCustomer,
+  listOrders: backend.listOrders,
+  createOrder: backend.createOrder,
+  getOrder: backend.getOrder,
+  listPayments: backend.listPayments,
+  createPayment: backend.createPayment,
+  listOutlets: backend.listOutlets,
+  listDispatchRequests: backend.listDispatchRequests,
+  createDispatchRequest: backend.createDispatchRequest,
+  approveDispatchRequest: backend.approveDispatchRequest,
+  createDispatch: backend.createDispatch,
 };
 
 // Also export named functions for direct imports
@@ -26,15 +49,27 @@ export const {
   listWastage,
   createWastage,
   listProducts,
+  listBatches,
   updateStock,
   getDashboardData,
   getSalesReport,
+  getSalesReportPdf,
   getWastageReport,
   listUsers,
   createUser,
   updateUser,
   toggleUserStatus,
   resetUserPassword,
+  saveOutletSettings,
+  registerCustomer,
+  listOrders,
+  createOrder,
+  getOrder,
+  listPayments,
+  createPayment,
+  listOutlets,
+  listDispatchRequests,
+  createDispatchRequest,
+  approveDispatchRequest,
+  createDispatch,
 } = backend;
-
-export type ApiError = backend.ApiError;

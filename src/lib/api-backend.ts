@@ -145,6 +145,12 @@ export interface Wastage {
   created_at: string;
 }
 
+export interface ReplenishmentPlan {
+  product_id: number;
+  product_name: string;
+  needed_for_tomorrow: number;
+}
+
 // Helper function to safely handle both direct JSON arrays or enveloped backend data payloads
 const parseResponseData = (response: any) => {
   if (!response || !response.data) return [];
@@ -279,6 +285,11 @@ export const updateStock = async (id: string, newStock: number): Promise<Product
     reason: "manual_adjustment",
   });
   return response.data.data || response.data;
+};
+
+export const getReplenishmentPlan = async (): Promise<ReplenishmentPlan[]> => {
+  const response = await apiClient.get("/products/replenishment_plan/");
+  return parseResponseData(response);
 };
 
 // ============================================================

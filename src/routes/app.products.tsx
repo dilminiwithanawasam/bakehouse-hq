@@ -5,7 +5,7 @@
  */
 
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Plus, Layers, Package, Loader2, Calendar, AlertCircle, ShieldAlert, Edit3, XCircle } from "lucide-react";
@@ -21,6 +21,8 @@ import {
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
+
+
 // Connect directly to your underlying network adapter layer functions
 import { 
   listProducts, 
@@ -29,6 +31,8 @@ import {
   createBatch, 
   updateProduct,
   updateBatch,
+  getReplenishmentPlan,
+  type  ReplenishmentPlan,
   type Product, 
   type ProductBatch 
 } from "@/lib/api-backend";
@@ -41,6 +45,7 @@ function ProductsManagementPage() {
   const qc = useQueryClient();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"products" | "batches">("products");
+  const [replenishmentPlan, setReplenishmentPlan] = useState<ReplenishmentPlan[]>([]);
   
   // Local screen visibility text errors to completely bypass silent failures
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -51,6 +56,9 @@ function ProductsManagementPage() {
 
   // RBAC Enforcement: Verifies if user account holds executive administration privileges
   const isStaffUser = user?.role === "admin" || user?.role === "manager";
+  useEffect(() => {
+    getReplenishmentPlan().then(setReplenishmentPlan).catch(() => console.warn("Plan unavailable"));
+  }, []);
 
   // --- LIVE DATA STORAGE PIPELINES ---
   const { data: products = [], isLoading: productsLoading } = useQuery<Product[], Error>({
@@ -342,22 +350,28 @@ function ProductsManagementPage() {
                 {/* SELECT DROPDOWN ELEMENT CONTAINER */}
                 <div className="space-y-1.5">
                   <Label htmlFor="product-select" className="text-xs font-bold text-slate-600">Select Bakery Product</Label>
+                  
                   <select 
-                    id="product-select"
-                    title="Select a product"
-                    className="w-full h-10 px-3 py-2 rounded-md border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-800 focus:outline-none"
+                  aria-label="Select Bakery Product"
+                    className="w-full h-10 border rounded px-2 text-sm"
                     value={selectedProdId}
                     onChange={(e) => {
-                      setSelectedProdId(e.target.value);
+                      const val = e.target.value;
+                      setSelectedProdId(val);
                       setValidationError(null);
+                      // This is the new logic
+                      const plan = replenishmentPlan.find(p => p.product_id === Number(val));
+                      if (plan) {
+                        setQtyProduced(String(plan.needed_for_tomorrow));
+                        toast.info(`Suggested production: ${plan.needed_for_tomorrow} units`);
+                      } else {
+                        setQtyProduced("");
+                      }
                     }}
-                    disabled={!!editingBatchItem} // Lock selection field on update actions to ensure mathematical data consistency
                   >
                     <option value="">-- Choose Product --</option>
-                    {products.map((p: Product) => (
-                      <option key={p.id} value={String(p.id)}>
-                        {p.name}
-                      </option>
+                    {products.map((p) => (
+                      <option key={p.id} value={String(p.id)}>{p.name}</option>
                     ))}
                   </select>
                 </div>

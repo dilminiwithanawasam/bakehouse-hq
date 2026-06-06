@@ -4,12 +4,15 @@ Fully supports full CRUD workflows (including editing product and batch records)
 file: backend/apps/products/views.py
 """
 
+from apps import products
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
 from apps.products.models import Product, ProductCategory, ProductBatch, Outlet, DispatchRequest, Dispatch
 from apps.products.serializers import (
@@ -117,3 +120,19 @@ class ProductViewSet(viewsets.ModelViewSet):
             {'success': True, 'data': {'old_stock': old_stock, 'new_stock': product.stock}}, 
             status=status.HTTP_200_OK
         )
+    @action(detail=False, methods=['get'])
+    def replenishment_plan(self, request):
+        products = Product.objects.filter(is_active=True)
+        plan = []
+        for p in products:
+            # Needed = Target - Current Stock
+            needed = max(0, p.target_stock - p.stock)
+            plan.append({
+                "product_id": p.id,
+                "product_name": p.name,
+                "sold_today": p.total_sold,
+                "remaining": p.stock,
+                "wasted": p.total_wasted,
+                "needed_for_tomorrow": needed
+            })
+        return Response(plan)

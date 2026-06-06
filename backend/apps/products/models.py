@@ -32,6 +32,7 @@ class Product(TimeStampedModel):
     name = models.CharField(max_length=255, db_index=True)
     category = models.ForeignKey(ProductCategory, on_delete=models.PROTECT, related_name='products')
     price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
+    target_stock = models.IntegerField(default=50)
     
     # Freshness Parameter (SRS Section 4.4)
     shelf_life_days = models.IntegerField(default=3, validators=[MinValueValidator(1)])
@@ -77,6 +78,13 @@ class Product(TimeStampedModel):
         elif self.stock <= self.min_stock * 1.5:
             return 'low'
         return 'healthy'
+    def update_stock_from_batches(self):
+        # We use a filter to find active batches for this product
+        total = self.batches.filter(is_active=True).aggregate(
+            total_stock=models.Sum('current_quantity')
+        )['total_stock'] or 0
+        self.stock = total
+        self.save(update_fields=['stock'])
 
 
 class Outlet(TimeStampedModel):
@@ -169,7 +177,8 @@ class StockAdjustment(TimeStampedModel):
     new_stock = models.IntegerField()
     # 🌟 OPTION 1 INTEGRATION: Audit metadata stored in the flexible notes field
     notes = models.TextField(null=True, blank=True)
-
+    sale = models.ForeignKey('sales.Sale', on_delete=models.SET_NULL, null=True, blank=True)
+    adjusted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     class Meta:
         db_table = 'products_stock_adjustment'
         ordering = ['-created_at']

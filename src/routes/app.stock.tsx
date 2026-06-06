@@ -48,10 +48,13 @@ function StockPage() {
   const [query, setQuery] = useState("");
   const [cat, setCat] = useState("all");
 
-  const categories = useMemo(
-    () => ["all", ...Array.from(new Set(products.map((p) => p.category)))],
-    [products],
-  );
+const categories = useMemo(
+  () => [
+    "all", 
+    ...Array.from(new Set(products.map((p) => String(p.category))))
+  ],
+  [products],
+);
   const filtered = products.filter(
     (p) =>
       (cat === "all" || p.category === cat) && p.name.toLowerCase().includes(query.toLowerCase()),

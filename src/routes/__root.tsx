@@ -72,13 +72,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Sunrise Bakery OS — Operations & Analytics" },
+      { title: "BakeryHUB — Operations & Analytics" },
       {
         name: "description",
         content: "Modern bakery management for sales, wastage, stock and analytics.",
       },
       { name: "author", content: "Sunrise Bakery" },
-      { property: "og:title", content: "Sunrise Bakery OS" },
+      { property: "og:title", content: "BakeryHUB" },
       {
         property: "og:description",
         content: "Modern bakery management for sales, wastage, stock and analytics.",

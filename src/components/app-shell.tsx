@@ -8,7 +8,7 @@ import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 import {
   LayoutDashboard, ShoppingCart, Trash2, Boxes,
-  Users, Settings, LogOut, Menu, Bell, Croissant, X,
+  Users, Settings, LogOut, Menu, Bell, Croissant, X, Package
 } from "lucide-react";
 import { useAuth, ROLE_LABEL } from "@/lib/auth";
 import type { Role } from "@/lib/mock-data";
@@ -25,12 +25,13 @@ interface NavItem { to: string; label: string; icon: typeof LayoutDashboard; rol
 
 // Navigation Layout Array Configuration
 const NAV: NavItem[] = [
-  { to: "/app/dashboard", label: "Dashboard",       icon: LayoutDashboard, roles: ["admin","manager","salesperson"] },
-  { to: "/app/sales",     label: "Sales Entry",     icon: ShoppingCart,    roles: ["admin","manager","salesperson"] },
-  { to: "/app/wastage",   label: "Wastage",         icon: Trash2,          roles: ["admin","manager","salesperson"] },
-  { to: "/app/stock",     label: "Stock Counting",  icon: Boxes,           roles: ["admin","manager","salesperson"] },
-  { to: "/app/users",     label: "User Management", icon: Users,           roles: ["admin"] },
-  { to: "/app/settings",  label: "Settings",        icon: Settings,        roles: ["admin","manager","salesperson"] },
+  { to: "/app/dashboard", label: "Dashboard",        icon: LayoutDashboard, roles: ["admin","manager","salesperson"] },
+  { to: "/app/sales",     label: "Sales Entry",      icon: ShoppingCart,    roles: ["admin","manager","salesperson"] },
+  { to: "/app/products",  label: "Products Catalog", icon: Package,         roles: ["admin","manager","salesperson"] },
+  { to: "/app/wastage",   label: "Wastage",          icon: Trash2,          roles: ["admin","manager","salesperson"] },
+  { to: "/app/stock",     label: "Stock Counting",   icon: Boxes,           roles: ["admin","manager","salesperson"] },
+  { to: "/app/users",     label: "User Management",  icon: Users,           roles: ["admin"] },
+  { to: "/app/settings",  label: "Settings",         icon: Settings,        roles: ["admin","manager","salesperson"] },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -59,7 +60,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-foreground/40" onClick={() => setMobileOpen(false)} />
           <aside className="relative w-64 bg-sidebar flex flex-col">
-            {/* 🌟 FIXED: Added accessibility identifiers to the close button */}
             <button 
               aria-label="Close navigation menu"
               title="Close menu"
@@ -76,7 +76,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Navigation Header bar */}
         <header className="sticky top-0 z-30 h-16 border-b bg-background/80 backdrop-blur flex items-center px-4 sm:px-6 gap-3">
-          {/* 🌟 FIXED: Added accessibility identifiers to the menu button toggle */}
           <button 
             aria-label="Open navigation menu"
             title="Open menu"
@@ -86,12 +85,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Menu className="h-5 w-5" />
           </button>
           <div className="flex flex-col">
-            <span className="text-sm font-bold text-slate-800 tracking-tight">BakeryHUB Management OS</span>
+            <span className="text-sm font-bold text-slate-800 tracking-tight">BakeryHUB Management System</span>
             <span className="text-xs text-muted-foreground font-semibold">{today}</span>
           </div>
 
           <div className="ml-auto flex items-center gap-2">
-            {/* 🌟 FIXED: Added descriptive metadata variables to icon button */}
             <Button 
               aria-label="View system notifications" 
               title="Notifications" 
@@ -134,7 +132,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        {/* 🌟 FIXED: Optimized custom dynamic spacing to standard fluid width layout rules */}
+        {/* Optimized custom dynamic spacing to standard fluid width layout rules */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
           {children}
         </main>
@@ -155,7 +153,7 @@ function SidebarContent({
         </div>
         <div>
           <div className="font-black tracking-tight text-slate-900 leading-tight">BakeryHUB</div>
-          <div className="text-[11px] font-bold text-muted-foreground leading-tight">Management OS</div>
+          <div className="text-[11px] font-bold text-muted-foreground leading-tight">Management system</div>
         </div>
       </div>
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
@@ -188,7 +186,7 @@ function SidebarContent({
             </Badge>
           </div>
           <p className="text-muted-foreground leading-snug font-semibold">
-            Core Inventory System Staged
+            Core Inventory Active
           </p>
         </div>
       </div>

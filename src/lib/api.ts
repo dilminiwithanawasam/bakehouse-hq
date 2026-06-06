@@ -72,4 +72,6 @@ export const {
   createDispatchRequest,
   approveDispatchRequest,
   createDispatch,
+  updateBatch,
+  updateProduct
 } = backend;

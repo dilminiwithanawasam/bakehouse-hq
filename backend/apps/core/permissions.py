@@ -70,18 +70,28 @@ class IsFactoryDistributor(BasePermission):
 
 
 class IsSalesperson(BasePermission):
-    """Allow access to checkout counter Salespersons and Admins (SRS Section 2.3)."""
-    message = 'Salesperson access required.'
+    """
+    Grants access to Admins, Managers, and Salespeople.
+    """
+    message = 'Required role: Admin, Manager, or Salesperson.'
 
     def has_permission(self, request, view):
-        return bool(
-            request.user and
-            request.user.is_authenticated and
-            (
-                request.user.is_superuser or
-                getattr(request.user, 'role', None) == 'salesperson' or
-                has_group(request.user, 'Salesperson')
-            )
+        if not (request.user and request.user.is_authenticated):
+            return False
+            
+        # Allow superusers automatically
+        if request.user.is_superuser:
+            return True
+
+        # Check for role string OR group membership
+        user_role = getattr(request.user, 'role', None)
+        authorized_roles = ['admin', 'manager', 'salesperson']
+        
+        return (
+            user_role in authorized_roles or 
+            has_group(request.user, 'Salesperson') or
+            has_group(request.user, 'Manager') or
+            has_group(request.user, 'Admin')
         )
 
 

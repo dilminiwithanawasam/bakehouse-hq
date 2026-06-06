@@ -1,12 +1,12 @@
 """
-Serializers for wastage.
+Serializers for wastage management.
 """
 
 from rest_framework import serializers
 from decimal import Decimal
 from apps.wastage.models import Wastage
 from apps.products.serializers import ProductSerializer
-
+from apps.products.models import StockAdjustment
 
 class WastageSerializer(serializers.ModelSerializer):
     """Serializer for wastage representation."""
@@ -38,23 +38,21 @@ class WastageCreateSerializer(serializers.ModelSerializer):
         model = Wastage
         fields = [
             'date', 'product', 'batch', 'quantity', 'reason',
-            'unit_cost', 'notes',
+            'unit_cost', 'notes'
         ]
+        read_only_fields = ['recorded_by']
 
     def validate_quantity(self, value):
-        """Validate quantity is positive."""
         if value <= 0:
             raise serializers.ValidationError('Quantity must be positive.')
         return value
 
     def validate_unit_cost(self, value):
-        """Validate unit cost is non-negative."""
         if value < 0:
             raise serializers.ValidationError('Unit cost cannot be negative.')
         return value
 
     def validate(self, attrs):
-        """Validate the entire object."""
         product = attrs.get('product')
         batch = attrs.get('batch')
         quantity = attrs.get('quantity')
@@ -69,47 +67,48 @@ class WastageCreateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     f'Batch {batch.batch_number} has insufficient quantity. Available: {batch.current_quantity}.'
                 )
-
         return attrs
 
-    def create(self, validated_data):
-        """Create wastage record and decrement product stock."""
+def create(self, validated_data):
         from apps.products.models import StockAdjustment
         
-        validated_data['recorded_by'] = self.context['request'].user
+        # 1. Manually extract the user from the context
+        user = self.context['request'].user
         
-        # Calculate loss
+        # 2. Calculate loss explicitly
         quantity = validated_data.get('quantity', 0)
         unit_cost = validated_data.get('unit_cost', 0)
-        validated_data['loss'] = Decimal(quantity) * Decimal(unit_cost)
+        validated_data['loss'] = Decimal(str(quantity)) * Decimal(str(unit_cost))
         
+        # 3. Create the instance, passing the user directly here
+        wastage = Wastage(
+            **validated_data,
+            recorded_by=user  # Assigning here ensures it's available for the save() call
+        )
+        wastage.save()
+        
+        # 4. Inventory logic
         batch = validated_data.get('batch')
         product = validated_data['product']
 
-        # Create wastage record
-        wastage = Wastage.objects.create(**validated_data)
-        
-        # Adjust stock
-        old_stock = product.stock
         if batch:
             batch.current_quantity -= quantity
             batch.save()
-        product.total_wasted += quantity
-        product.update_stock_from_batches()
+            
+        product.stock -= quantity 
+        product.save(update_fields=['stock'])
         
-        # Log adjustment
+        # 5. Log adjustment
         StockAdjustment.objects.create(
             product=product,
             quantity=-quantity,
             reason='wastage',
-            old_stock=old_stock,
+            old_stock=product.stock + quantity,
             new_stock=product.stock,
-            wastage=wastage,
-            adjusted_by=self.context['request'].user,
+            notes=f"Wastage ID: {wastage.id} | User: {user.username}"
         )
         
         return wastage
-
 
 class WastageApproveSerializer(serializers.Serializer):
     """Serializer for approving wastage records."""

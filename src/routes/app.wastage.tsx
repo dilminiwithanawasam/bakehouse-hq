@@ -1,6 +1,6 @@
 /**
  * Synchronized Material Wastage Reconciliation Desk
- * Implements loose type interlocks to ensure successful compiler builds across branches.
+ * DESIGN: Humanized user-friendly bakery terminology with active type conversion handling.
  * file: src/routes/app.wastage.tsx
  */
 
@@ -26,7 +26,7 @@ import {
   LineChart,
   Legend,
 } from "recharts";
-import { Plus, Trash2, AlertOctagon, TrendingDown, DollarSign } from "lucide-react";
+import { Plus, Trash2, AlertOctagon, TrendingDown, DollarSign, Loader2 } from "lucide-react";
 
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -45,13 +45,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -60,38 +53,50 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { currency, type WastageReason } from "@/lib/mock-data";
-import { api, type Product, type ProductBatch, type Wastage } from "@/lib/api";
+import { currency } from "@/lib/mock-data";
+import { cn } from "@/lib/utils";
+
+// Hook up service layers cleanly
+import { 
+  listWastage, 
+  createWastage, 
+  listProducts, 
+  listBatches, 
+  type Product, 
+  type ProductBatch, 
+  type Wastage 
+} from "@/lib/api-backend";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/app/wastage")({ component: WastagePage });
 
-const REASONS: WastageReason[] = ["Expired", "Damaged", "Returned", "Overproduction"];
-const PIE_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)"];
+const REASONS = ["Expired", "Damaged", "Returned", "Overproduction"] as const;
+const PIE_COLORS = ["#ef4444", "#f59e0b", "#3b82f6", "#10b981"];
 
 const schema = z.object({
-  productId: z.string().min(1, "Select product"),
-  qty: z.coerce.number().int().positive("Qty must be > 0"),
+  productId: z.string().min(1, "Please select a product"),
+  batchId: z.string().min(1, "Please select an associated baking batch"),
+  qty: z.coerce.number().int().positive("Quantity must be greater than 0"),
   reason: z.enum(["Expired", "Damaged", "Returned", "Overproduction"]),
-  loss: z.coerce.number().nonnegative(),
   notes: z.string().max(300).optional(),
 });
 type FormVals = z.infer<typeof schema>;
 
 function WastagePage() {
   const { user } = useAuth();
+  console.log("Current User:", user);
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [batchId, setBatchId] = useState("");
 
-  // Fetch real synchronized records out of PostgreSQL database tables
-  const { data: wastages = [] } = useQuery<Wastage[]>({
+  // --- LIVE DATA STORAGE PIPELINES ---
+  const { data: wastages = [], isLoading: logsLoading } = useQuery<Wastage[], Error>({
     queryKey: ["wastage"],
-    queryFn: () => api.listWastage(),
+    queryFn: () => listWastage(),
   });
-  const { data: products = [], isLoading: productsLoading } = useQuery<Product[]>({
+
+  const { data: products = [], isLoading: productsLoading } = useQuery<Product[], Error>({
     queryKey: ["products"],
-    queryFn: () => api.listProducts(),
+    queryFn: () => listProducts(),
   });
 
   const {
@@ -103,36 +108,70 @@ function WastagePage() {
     formState: { errors, isSubmitting },
   } = useForm<FormVals>({
     resolver: zodResolver(schema),
-    defaultValues: { qty: 1, reason: "Expired", loss: 0 },
+    // 🌟 FIXED: Added fallback string assignments to shield schema elements from undefined evaluation loops
+    defaultValues: { productId: "", batchId: "", qty: 1, reason: "Expired", notes: "" },
   });
 
   const productId = watch("productId");
-  const product = products.find((p: any) => String(p.id) === productId);
+  const batchId = watch("batchId");
+  const product = products.find((p) => String(p.id) === productId);
 
-  const create = useMutation({
-    // 🌟 FIX 1: Cast object literal payload as 'any' to bypass strict version parameter checks
-    mutationFn: async (v: FormVals) =>
-      api.createWastage({
-        date: new Date().toISOString().slice(0, 10),
-        productId: v.productId,
-        qty: v.qty,
-        reason: v.reason,
-        loss: v.loss,
-        notes: v.notes,
-      } as any),
-    onSuccess: () => {
-      toast.success("Wastage recorded successfully");
-      reset();
-      setBatchId("");
-      setOpen(false);
-      qc.invalidateQueries({ queryKey: ["wastage"] });
-    },
+  // REACTIVE BATCH FETCHING: Automatically queries lots matching the active product selection
+  const { data: allBatches = [], isLoading: batchesLoading } = useQuery<ProductBatch[], Error>({
+    queryKey: ["batches", productId],
+    queryFn: () => listBatches({ product: productId }),
+    enabled: Boolean(productId),
   });
 
-  const totalLoss = wastages.reduce((s, w: any) => s + Number(w.loss || 0), 0);
+  // Filter down strictly to unexhausted tracking sequences
+  const activeBatches = productId
+    ? allBatches.filter((b) => String(b.product) === productId && b.is_active && b.current_quantity > 0)
+    : [];
+
+  // --- MUTATION WRITERS: DATA TRANSACTIONS ---
+  const createMutation = useMutation({
+    mutationFn: async (v: FormVals) => {
+      const selectedBatchInstance = activeBatches.find(b => String(b.id) === v.batchId);
+      
+      // Enforce physical constraints check prior to transmission requests
+      if (selectedBatchInstance && v.qty > selectedBatchInstance.current_quantity) {
+        throw new Error(`Stock limit error: This batch only has ${selectedBatchInstance.current_quantity} items left.`);
+      }
+
+      // Automatically calculate base manufacturing costs or infer values cleanly
+      const inferredUnitCost = product ? (product.cost_price || Number(product.price) * 0.65) : 0;
+
+      return createWastage({
+        date: new Date().toISOString().slice(0, 10),
+        productId: v.productId,
+        batchId: v.batchId,
+        qty: v.qty,
+        reason: v.reason,
+        unitCost: inferredUnitCost,
+        notes: v.notes,
+      });
+    },
+    onSuccess: () => {
+      toast.success("Wastage logged successfully.");
+      reset();
+      setOpen(false);
+      
+      // Force programmatic cache invalidation loops to keep charts updated
+      qc.invalidateQueries({ queryKey: ["wastage"] });
+      qc.invalidateQueries({ queryKey: ["products"] });
+      qc.invalidateQueries({ queryKey: ["batches-all"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-summary-kpis"] });
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Failed to save wastage entry.");
+    }
+  });
+
+  // --- ANALYTICAL CHART CALCULATIONS MATRIX ---
+  const totalLoss = wastages.reduce((sum, w: any) => sum + Number(w.loss || 0), 0);
   const todayLoss = wastages
     .filter((w: any) => w.date === new Date().toISOString().slice(0, 10))
-    .reduce((s, w: any) => s + Number(w.loss || 0), 0);
+    .reduce((sum, w: any) => sum + Number(w.loss || 0), 0);
 
   const byReason = useMemo(() => {
     const map = new Map<string, number>();
@@ -152,7 +191,7 @@ function WastagePage() {
     return Array.from(map.entries())
       .map(([id, qty]) => {
         const prod = products.find((p: any) => String(p.id) === id);
-        return { name: prod?.name ?? `Product ${id}`, qty };
+        return { name: prod?.name ?? `Product ID #${id}`, qty };
       })
       .sort((a, b) => b.qty - a.qty)
       .slice(0, 6);
@@ -169,254 +208,219 @@ function WastagePage() {
   return (
     <>
       <PageHeader
-        title="Wastage management"
-        description="Track expired, damaged, returned and over-produced items. Understand the real cost."
+        title="Wastage & Loss Records"
+        description="Track spoiled, expired, or dropped items to keep your inventory numbers accurate."
         actions={
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Record wastage
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="bg-white">
-              <DialogHeader>
-                <DialogTitle>Record wastage</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit((v) => create.mutate(v))} className="space-y-3">
-                <div className="space-y-1.5">
-                  <Label>Product</Label>
-                  <Select
-                    value={productId}
-                    onValueChange={(v) => {
-                      setValue("productId", v);
-                      setBatchId("");
-                      const p = products.find((pp: any) => String(pp.id) === v);
-                      if (p) setValue("loss", Number(p.price));
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select product…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {productsLoading && <SelectItem value="__loading__" disabled>Loading Catalog…</SelectItem>}
-                      {products
-                        ?.filter((p) => p?.id)
-                        .map((p: any) => (
-                          <SelectItem key={p.id} value={String(p.id)}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                  {errors.productId && (
-                    <p className="text-xs text-destructive font-bold">{errors.productId.message}</p>
-                  )}
-                </div>
-                
-                <div className="grid grid-cols-2 gap-3">
+           ["admin", "manager", "salesperson"].includes(user?.role ?? "") && (
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-slate-950 text-white font-bold hover:bg-slate-800">
+                  <Plus className="h-4 w-4 mr-2" /> Record Wastage
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-white max-w-md rounded-2xl border-0 shadow-xl p-6">
+                <DialogHeader>
+                  <DialogTitle className="text-xl font-black text-slate-800 tracking-tight">Record Wasted Items</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit((v) => createMutation.mutate(v))} className="space-y-4 mt-2">
+                  
+                  {/* Product Selection */}
                   <div className="space-y-1.5">
-                    <Label>Quantity</Label>
-                    <Input type="number" min={1} {...register("qty")} />
-                    {errors.qty && <p className="text-xs text-destructive font-bold">{errors.qty.message}</p>}
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Reason</Label>
-                    <Select
-                      value={watch("reason")}
-                      onValueChange={(v) => setValue("reason", v as WastageReason)}
+                    <Label htmlFor="wastage-product-picker" className="text-xs font-bold text-slate-600">Select Product</Label>
+                    {/* 🌟 FIXED: Linked via register containing form lifecycle handler hooks to prevent silent submittal locks */}
+                    <select
+                      id="wastage-product-picker"
+                      {...register("productId", {
+                        onChange: (e) => {
+                          setValue("productId", e.target.value);
+                          setValue("batchId", ""); // Reset downstream lots values
+                        }
+                      })}
+                      title="Choose Target Bakery Product"
+                      className="w-full h-10 px-3 rounded-md border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-800 focus:outline-none"
                     >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {REASONS.map((r) => (
-                          <SelectItem key={r} value={r}>
-                            {r}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      <option value="">-- Select Product --</option>
+                      {productsLoading && <option disabled>Loading system catalog...</option>}
+                      {products.filter(p => p.id && p.is_active).map(p => (
+                        <option key={p.id} value={String(p.id)}>{p.name}</option>
+                      ))}
+                    </select>
+                    {errors.productId && <p className="text-xs text-red-500 font-bold mt-1">{errors.productId.message}</p>}
                   </div>
-                </div>
-                
-                <div className="space-y-1.5">
-                  <Label>Estimated loss (LKR)</Label>
-                  <Input type="number" min={0} {...register("loss")} />
-                  {product && (
-                    <p className="text-xs text-muted-foreground font-semibold">
-                      Unit price · LKR {Number(product.price).toLocaleString()}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Notes</Label>
-                  <Textarea rows={2} {...register("notes")} placeholder="Optional context…" />
-                </div>
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" className="bg-slate-900 text-white hover:bg-slate-800" disabled={isSubmitting || create.isPending}>
-                    Save
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+
+                  {/* Batch Link Field Selector */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="wastage-batch-picker" className="text-xs font-bold text-slate-600">Baking Batch Reference</Label>
+                    {/* 🌟 FIXED: Linked register onto lot option rows context parameters */}
+                    <select
+                      id="wastage-batch-picker"
+                      {...register("batchId", {
+                        onChange: (e) => setValue("batchId", e.target.value)
+                      })}
+                      title="Select Lot reference code"
+                      className="w-full h-10 px-3 rounded-md border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-800 focus:outline-none disabled:opacity-50"
+                      disabled={!productId || batchesLoading}
+                    >
+                      <option value="">-- Select Batch Number --</option>
+                      {batchesLoading && <option disabled>Loading active baking batches...</option>}
+                      {activeBatches.map(b => (
+                        <option key={b.id} value={String(b.id)}>{b.batch_number} ({b.current_quantity} left)</option>
+                      ))}
+                    </select>
+                    {errors.batchId && <p className="text-xs text-red-500 font-bold mt-1">{errors.batchId.message}</p>}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-slate-600">Quantity Lost</Label>
+                      <Input type="number" min={1} {...register("qty")} className="h-10 border-slate-200 bg-slate-50 text-xs" />
+                      {errors.qty && <p className="text-xs text-red-500 font-bold mt-1">{errors.qty.message}</p>}
+                    </div>
+                    
+                    <div className="space-y-1.5">
+                      <Label htmlFor="wastage-reason-picker" className="text-xs font-bold text-slate-600">Reason for Wastage</Label>
+                      {/* 🌟 FIXED: Handled reason registration cleanly */}
+                      <select
+                        id="wastage-reason-picker"
+                        {...register("reason", {
+                          onChange: (e) => setValue("reason", e.target.value as any)
+                        })}
+                        title="Select a reason"
+                        className="w-full h-10 px-3 rounded-md border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-800 focus:outline-none"
+                      >
+                        {REASONS.map((r) => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-slate-600">Additional Notes</Label>
+                    <Textarea rows={2} {...register("notes")} className="border-slate-200 bg-slate-50 text-sm resize-none" placeholder="Provide any extra details about the loss (e.g., dropped item, box damage)..." />
+                    {errors.notes && <p className="text-xs text-red-500 font-bold mt-1">{errors.notes.message}</p>}
+                  </div>
+
+                  <DialogFooter className="pt-2">
+                    <Button type="button" variant="outline" className="h-10 border-slate-200 font-bold" onClick={() => setOpen(false)}>
+                      Cancel
+                    </Button>
+                    {/* 🌟 FIXED: Changed jargon text from 'Commit Audit Write-Off' to 'Record Wastage' */}
+                    <Button type="submit" className="h-10 bg-slate-950 font-bold text-white hover:bg-slate-800" disabled={isSubmitting || createMutation.isPending}>
+                      {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Record Wastage"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )
         }
       />
 
+      {/* Summary Stat Cards Block */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Wastage today"
-          value={`LKR ${todayLoss.toLocaleString()}`}
-          icon={DollarSign}
-          accent="destructive"
-        />
-        <StatCard
-          label="Total loss (week)"
-          value={`LKR ${totalLoss.toLocaleString()}`}
-          icon={TrendingDown}
-          accent="amber"
-        />
-        <StatCard
-          label="Top reason"
-          value={byReason.sort((a, b) => b.value - a.value)[0]?.name ?? "—"}
-          icon={AlertOctagon}
-          accent="primary"
-        />
-        <StatCard
-          label="Items wasted"
-          value={wastages.reduce((s, w: any) => s + Number(w.quantity || w.qty || 0), 0)}
-          icon={Trash2}
-          accent="sage"
-        />
+        <StatCard label="Wastage logged today" value={`Rs. ${todayLoss.toLocaleString()}`} icon={DollarSign} accent="destructive" />
+        <StatCard label="Total loss tracking" value={`Rs. ${totalLoss.toLocaleString()}`} icon={TrendingDown} accent="amber" />
+        <StatCard label="Top reason for loss" value={byReason.sort((a, b) => b.value - a.value)[0]?.name ?? "—"} icon={AlertOctagon} accent="primary" />
+        <StatCard label="Total items wasted" value={wastages.reduce((sum, w: any) => sum + Number(w.quantity || w.qty || 0), 0)} icon={Trash2} accent="sage" />
       </div>
 
+      {/* Analytical Visual Panels Matrix Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
-        <ChartCard title="Wastage trend" description="Daily loss" className="lg:col-span-2">
+        <ChartCard title="Wastage tracking timeline" description="Daily loss values graph" className="lg:col-span-2">
           <ResponsiveContainer width="100%" height={260}>
             <LineChart data={trend}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-              <XAxis
-                dataKey="date"
-                stroke="var(--muted-foreground)"
-                fontSize={11}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                stroke="var(--muted-foreground)"
-                fontSize={11}
-                tickLine={false}
-                axisLine={false}
-              />
-              <Tooltip contentStyle={tooltipStyle} />
-              <Line
-                type="monotone"
-                dataKey="loss"
-                stroke="var(--destructive)"
-                strokeWidth={2}
-                dot={{ r: 3 }}
-              />
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+              <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+              <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v) => `Rs. ${Number(v).toLocaleString()}`} />
+              <Line type="monotone" dataKey="loss" stroke="#ef4444" strokeWidth={2.5} fillOpacity={1} dot={{ r: 4, strokeWidth: 0, fill: "#ef4444" }} />
             </LineChart>
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="By reason" description="Share of loss">
+        <ChartCard title="Wastage breakdown by cause" description="Percentage distribution share of total loss cost">
           <ResponsiveContainer width="100%" height={260}>
             <PieChart>
-              <Pie
-                data={byReason}
-                dataKey="value"
-                nameKey="name"
-                innerRadius={45}
-                outerRadius={85}
-                paddingAngle={3}
-              >
+              <Pie data={byReason} dataKey="value" nameKey="name" innerRadius={50} outerRadius={85} paddingAngle={4}>
                 {byReason.map((_, i) => (
                   <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip contentStyle={tooltipStyle} />
-              <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v) => `Rs. ${Number(v).toLocaleString()}`} />
+              <Legend iconType="circle" wrapperStyle={{ fontSize: 11, fontWeight: "bold" }} />
             </PieChart>
           </ResponsiveContainer>
         </ChartCard>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
-        <ChartCard title="Most wasted products" description="By units">
+        <ChartCard title="Most high-leakage products" description="Total items lost tracking by units">
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={byProduct} layout="vertical" margin={{ left: 12 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-              <XAxis
-                type="number"
-                stroke="var(--muted-foreground)"
-                fontSize={10}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                dataKey="name"
-                type="category"
-                width={120}
-                stroke="var(--muted-foreground)"
-                fontSize={10}
-                tickLine={false}
-                axisLine={false}
-              />
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+              <XAxis type="number" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
+              <YAxis dataKey="name" type="category" width={120} stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
               <Tooltip contentStyle={tooltipStyle} />
-              <Bar dataKey="qty" fill="var(--chart-2)" radius={[0, 6, 6, 0]} />
+              <Bar dataKey="qty" name="Units Lost" fill="#f59e0b" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
 
-        <Card className="rounded-xl p-5 lg:col-span-2 bg-white border border-slate-100 shadow-sm">
-          <h3 className="font-bold text-slate-800 mb-4">Recent wastage entries</h3>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Product</TableHead>
-                <TableHead>Reason</TableHead>
-                <TableHead className="text-right">Qty</TableHead>
-                <TableHead className="text-right">Loss</TableHead>
-                <TableHead>Recorded by</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {wastages.length === 0 ? (
+        {/* Data List Table Ledger Grid View */}
+        <Card className="rounded-xl p-5 lg:col-span-2 bg-white border border-slate-100 shadow-sm overflow-hidden">
+          <h3 className="font-bold text-slate-800 mb-4 text-sm">Recent Wastage Logs</h3>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-slate-50">
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-6 text-slate-400">No logs compiled inside database files.</TableCell>
+                  <TableHead className="font-bold text-slate-700">Date Logged</TableHead>
+                  <TableHead className="font-bold text-slate-700">Product Name</TableHead>
+                  <TableHead className="font-bold text-slate-700">Reason</TableHead>
+                  <TableHead className="text-right font-bold text-slate-700">Quantity</TableHead>
+                  <TableHead className="text-right font-bold text-slate-700">Total Loss</TableHead>
+                  <TableHead className="font-bold text-slate-700">Recorded By</TableHead>
                 </TableRow>
-              ) : (
-                // 🌟 FIX 2: Switched w to 'any' type to gracefully digest dual column configurations (quantity vs qty)
-                wastages.slice(0, 8).map((w: any) => {
-                  const matchedProd = products.find((p: any) => String(p.id) === String(w.product));
-                  return (
-                    <TableRow key={w.id} className="hover:bg-slate-50/40 transition-colors">
-                      <TableCell className="text-muted-foreground font-semibold">{w.date}</TableCell>
-                      <TableCell className="font-bold text-slate-800">
-                        {matchedProd ? matchedProd.name : `Product ID: ${w.product}`}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="bg-muted font-bold capitalize">
-                          {w.reason}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-bold text-slate-700">{w.quantity || w.qty}</TableCell>
-                      <TableCell className="text-right text-destructive font-bold">
-                        LKR {Number(w.loss).toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground font-medium">{w.recorded_by_name || w.recorded_by || "Workstation User"}</TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {logsLoading && <TableRow><TableCell colSpan={6} className="text-center py-6 text-slate-400 font-medium">Loading records...</TableCell></TableRow>}
+                {!logsLoading && wastages.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-6 text-slate-400 font-semibold text-xs">No wastage logs recorded yet.</TableCell>
+                  </TableRow>
+                ) : (
+                  wastages.slice(0, 8).map((w: any) => {
+                    const matchedProd = products.find((p: any) => String(p.id) === String(w.product));
+                    return (
+                      <TableRow key={w.id} className="hover:bg-slate-50/40 text-xs font-semibold transition-colors">
+                        <TableCell className="text-muted-foreground font-bold">{w.date}</TableCell>
+                        <TableCell className="font-black text-slate-800">
+                          <div className="flex flex-col">
+                            <span>{matchedProd ? matchedProd.name : `Product ID #${w.product}`}</span>
+                            {w.batch_number && <span className="text-[10px] text-amber-700 font-mono font-medium">Batch link: {w.batch_number}</span>}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className={cn(
+                            "font-extrabold capitalize border text-[10px]",
+                            w.reason === "Expired" ? "bg-amber-50 text-amber-700 border-amber-100" :
+                            w.reason === "Damaged" ? "bg-red-50 text-red-700 border-red-100" : "bg-slate-50 text-slate-700 border-slate-100"
+                          )}>
+                            {w.reason}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-black text-slate-700">{w.quantity || w.qty} units</TableCell>
+                        <TableCell className="text-right text-red-600 font-black">
+                          Rs. {Number(w.loss).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground font-bold">{w.recorded_by_name || w.recorded_by || "Staff Account"}</TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </Card>
       </div>
     </>
@@ -424,9 +428,10 @@ function WastagePage() {
 }
 
 const tooltipStyle: React.CSSProperties = {
-  background: "var(--popover)",
-  border: "1px solid var(--border)",
-  borderRadius: 8,
-  fontSize: 12,
-  color: "var(--foreground)",
+  background: "#0f172a",
+  borderRadius: "8px",
+  fontSize: "12px",
+  fontWeight: "bold",
+  color: "#ffffff",
+  border: "0",
 };

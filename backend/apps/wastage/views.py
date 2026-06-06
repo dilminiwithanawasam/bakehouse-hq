@@ -10,13 +10,14 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.db.models import Sum, Count
 from django.utils import timezone
+from apps.core.permissions import IsSalesperson, IsManager, IsSalespersonOrManager
 
 from apps.wastage.models import Wastage
 from apps.wastage.serializers import (
     WastageSerializer,
     WastageCreateSerializer,
 )
-from apps.core.permissions import IsSalesperson, IsManager
+from apps.core.permissions import IsSalesperson, IsManager, IsSalespersonOrManager
 
 
 class WastageViewSet(viewsets.ModelViewSet):
@@ -28,7 +29,7 @@ class WastageViewSet(viewsets.ModelViewSet):
     GET /api/wastage/{id}/ - Get wastage details
     """
     queryset = Wastage.objects.select_related('product', 'recorded_by', 'approved_by').order_by('-date')
-    permission_classes = [IsAuthenticated, IsSalesperson]
+    permission_classes = [IsAuthenticated, IsSalespersonOrManager, IsSalesperson]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['date', 'product', 'reason', 'is_approved']
     search_fields = ['reference_number', 'notes', 'product__name']
@@ -50,30 +51,37 @@ class WastageViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(recorded_by=self.request.user)
         
         return queryset.order_by('-date')
+    def perform_create(self, serializer):
+        serializer.save(recorded_by=self.request.user)
 
-    def create(self, request, *args, **kwargs):
-        """Record wastage."""
-        serializer = self.get_serializer(data=request.data, context={'request': request})
-        serializer.is_valid(raise_exception=True)
-        
-        try:
-            wastage = serializer.save()
-            return Response(
-                {
-                    'success': True,
-                    'message': 'Wastage recorded successfully',
-                    'data': WastageSerializer(wastage).data,
-                },
-                status=status.HTTP_201_CREATED,
-            )
-        except Exception as e:
-            return Response(
-                {
-                    'success': False,
-                    'error': {'message': str(e)},
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        serializer.save(recorded_by=self.request.user)
+def create(self, request, *args, **kwargs):
+    """Record wastage."""
+
+    print("========== DEBUG ==========")
+    print("USER =", request.user)
+    print("USER ID =", getattr(request.user, "id", None))
+    print("AUTH =", request.user.is_authenticated)
+    print("HEADERS =", request.headers.get("Authorization"))
+    print("===========================")
+
+    serializer = self.get_serializer(
+        data=request.data,
+        context={'request': request}
+    )
+
+    serializer.is_valid(raise_exception=True)
+
+    wastage = serializer.save()
+
+    return Response(
+        {
+            'success': True,
+            'message': 'Wastage recorded successfully',
+            'data': WastageSerializer(wastage).data,
+        },
+        status=status.HTTP_201_CREATED,
+    )
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsManager])
     def approve(self, request, pk=None):

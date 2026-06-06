@@ -1,5 +1,5 @@
 /**
- * Updated API Service Layer with Automated Token Interceptor
+ * Cleaned API Service Layer with Automated Token Interceptor
  * PERSISTENCE SCHEMA: Django REST Framework + Simple JWT Auth Integration
  * file: src/lib/api-backend.ts
  */
@@ -9,7 +9,7 @@ import axios from "axios";
 // Base API connection gateway location
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
 
-// Master security file key location inside the browser browser database
+// Master security file key location inside the browser database
 const STORAGE_KEY = import.meta.env.VITE_JWT_STORAGE_KEY || "bakery_auth_v2";
 
 // Initialize our isolated custom network transmitter tool
@@ -90,16 +90,19 @@ export interface SaleItemPayload {
   discountAmount?: number;
 }
 
+// FIXED: Contains 'is_void' and 'cashier_name' fields to prevent TypeScript compile blocks on your screens
 export interface Sale {
   id: string;
   date: string;
   reference_number: string;
   cashier: string;
+  cashier_name?: string; // Maps staff context names to cashier definitions
   subtotal: number;
   tax_amount: number;
   discount_amount: number;
   total: number;
   payment_method: string;
+  is_void?: boolean;     // Maps administrative reverse status markers
   items: Array<{
     id: string;
     product: string;
@@ -209,14 +212,17 @@ export const listWastage = async (filters?: {
 };
 
 export const createWastage = async (data: WastagePayload): Promise<Wastage> => {
+  const roundedUnitCost = Number(data.unitCost.toFixed(2));
+  // 🌟 FIXED: Convert choice keys to lowercase strings to sync perfectly with backend Django tuples choice entries.
+  // 🌟 FIXED: Parse productId and batchId explicitly into numeric representations to satisfy foreign key rules.
   const payload = {
     date: data.date,
-    product: data.productId,
-    batch: data.batchId,
+    product: Number(data.productId),
+    batch: data.batchId ? Number(data.batchId) : null,
     quantity: data.qty,
-    reason: data.reason,
-    unit_cost: data.unitCost,
-    notes: data.notes,
+    reason: data.reason.toLowerCase(), 
+    unit_cost: roundedUnitCost,
+    notes: data.notes || "",
   };
 
   const response = await apiClient.post("/wastage/", payload);
@@ -224,7 +230,7 @@ export const createWastage = async (data: WastagePayload): Promise<Wastage> => {
 };
 
 // ============================================================
-// PRODUCTS API
+// PRODUCTS & BATCHES API (CRUD)
 // ============================================================
 
 export const listProducts = async (filters?: { category?: string }): Promise<Product[]> => {
@@ -240,6 +246,11 @@ export const createProduct = async (payload: any): Promise<Product> => {
   return response.data.data || response.data;
 };
 
+export const updateProduct = async (id: string, payload: any): Promise<Product> => {
+  const response = await apiClient.put(`/products/${id}/`, payload);
+  return response.data.data || response.data;
+};
+
 export const listBatches = async (filters?: { product?: string }): Promise<ProductBatch[]> => {
   const params = new URLSearchParams();
   if (filters?.product) params.append("product", filters.product);
@@ -249,7 +260,16 @@ export const listBatches = async (filters?: { product?: string }): Promise<Produ
 };
 
 export const createBatch = async (payload: any): Promise<ProductBatch> => {
-  const response = await apiClient.post("/products/batches/", payload);
+  const formattedPayload = {
+    ...payload,
+    batch_number: payload.batch_number?.trim() || ""
+  };
+  const response = await apiClient.post("/products/batches/", formattedPayload);
+  return response.data.data || response.data;
+};
+
+export const updateBatch = async (id: string, payload: any): Promise<ProductBatch> => {
+  const response = await apiClient.put(`/products/batches/${id}/`, payload);
   return response.data.data || response.data;
 };
 
@@ -373,7 +393,6 @@ export const forgotPassword = async (email: string): Promise<any> => {
   return response.data;
 };
 
-// 🌟 ADDED: Transmits cryptographic link parameters back down to the verification view
 export const resetPasswordConfirm = async (payload: Record<string, string>): Promise<any> => {
   const response = await apiClient.post("/auth/reset-password-confirm/", payload);
   return response.data;
@@ -448,8 +467,10 @@ export default {
   createWastage,
   listProducts,
   createProduct,
+  updateProduct,
   listBatches,
   createBatch,
+  updateBatch,
   updateStock,
   getDashboardData,
   getSalesReport,
@@ -459,7 +480,7 @@ export default {
   resetUserPassword,
   registerCustomer,
   forgotPassword, 
-  resetPasswordConfirm, // 🌟 Exported cleanly with safe double-slash comment styles
+  resetPasswordConfirm,
   listOrders,
   createOrder,
   getOrder,

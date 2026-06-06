@@ -102,20 +102,24 @@ class Wastage(AuditModel):
         return f"Wastage {self.reference_number or self.id} - {self.quantity} {self.product.name}"
 
     def save(self, *args, **kwargs):
-        """Generate reference number if not set."""
+        """Generate reference number and handle logic."""
+        # Only set reference if new
         if not self.reference_number:
             self.reference_number = f"WAS-{self.date.strftime('%Y%m%d')}-{timezone.now().timestamp()}"
         
         # Calculate loss if not set
         if not self.loss and self.quantity and self.unit_cost:
             from decimal import Decimal
-            self.loss = Decimal(self.quantity) * self.unit_cost
+            self.loss = Decimal(str(self.quantity)) * Decimal(str(self.unit_cost))
         
+        # SUPER IMPORTANT: Only call super().save() after ensuring recorded_by is set
+        # If this is a new record and recorded_by is None, the DB will raise the IntegrityError.
         super().save(*args, **kwargs)
         
-        # Update product total_wasted
-        self.product.total_wasted += self.quantity
-        self.product.save(update_fields=['total_wasted'])
+        # Update product totals only if this is a new record
+        if not kwargs.get('update_fields'):
+             self.product.total_wasted += self.quantity
+             self.product.save(update_fields=['total_wasted'])
 
     def approve(self, user):
         """Approve the wastage record."""

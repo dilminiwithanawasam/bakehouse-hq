@@ -296,8 +296,8 @@ export const getReplenishmentPlan = async (): Promise<ReplenishmentPlan[]> => {
 // DASHBOARD API
 // ============================================================
 
-export const getDashboardData = async () => {
-  const response = await apiClient.get("/reports/dashboard/");
+export const getDashboardData = async (params: { date: string; period: string }) => {
+  const response = await apiClient.get("/reports/dashboard/", { params });
   return response.data.data || response.data;
 };
 

@@ -7,7 +7,12 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Markdown docs
+*.md
+!README.md
+
 node_modules
+package-lock.json
 dist
 dist-ssr
 .output
@@ -32,3 +37,6 @@ dist-ssr
 *.sw?
 
 .early.coverage
+.env
+.venv
+.lovable

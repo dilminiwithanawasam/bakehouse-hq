@@ -14,9 +14,8 @@ class SaleTotalSoldTest(TestCase):
         self.prod = Product.objects.create(
             name='Test Prod',
             category=self.cat,
-            cost_price=Decimal('2.00'),
             price=Decimal('5.00'),
-            unit='piece',
+            measurement_type='piece',
             stock=0,
             min_stock=1,
             sku='TST-1',

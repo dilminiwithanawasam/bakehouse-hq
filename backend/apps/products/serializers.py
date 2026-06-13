@@ -70,3 +70,12 @@ class DispatchSerializer(serializers.ModelSerializer):
     class Meta:
         model = Dispatch
         fields = ['id', 'request', 'outlet', 'outlet_name', 'batch', 'batch_number', 'product_name', 'quantity_dispatched', 'driver_name', 'status', 'created_at']
+
+    def validate(self, attrs):
+        request = attrs.get('request')
+        batch = attrs.get('batch')
+        if request and request.status != 'approved':
+            raise serializers.ValidationError("Cannot dispatch for an unapproved request.")
+        if request and batch and batch.product != request.product:
+            raise serializers.ValidationError("Selected batch product does not match requested product.")
+        return attrs

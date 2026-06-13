@@ -82,8 +82,9 @@ class SaleCreateSerializer(serializers.Serializer):
             
             StockAdjustment.objects.create(
                 product=product, quantity=-quantity, reason='sale',
-                old_stock=product.stock + quantity, new_stock=product.stock, sale=sale,
-                adjusted_by=self.context['request'].user
+                old_stock=product.stock + quantity, new_stock=product.stock,
+                adjusted_by=self.context['request'].user,
+                notes=f"Sale #{sale.reference_number}"
             )
         return sale
 

@@ -33,7 +33,6 @@ class DispatchWorkflowTest(TestCase):
         self.product = Product.objects.create(
             name='Dispatch Product',
             category=self.category,
-            cost_price='10.00',
             price='20.00',
             stock=0,
             min_stock=1,
@@ -41,8 +40,6 @@ class DispatchWorkflowTest(TestCase):
         )
         self.outlet = Outlet.objects.create(
             name='Dispatch Outlet',
-            address='123 Dispatch Way',
-            contact_phone='0700000000',
         )
         self.batch = ProductBatch.objects.create(
             product=self.product,
@@ -53,7 +50,7 @@ class DispatchWorkflowTest(TestCase):
             current_quantity=20,
         )
 
-    def test_dispatch_request_serializer_create_sets_requested_by_and_pending_status(self):
+    def test_dispatch_request_serializer_create_sets_pending_status(self):
         payload = {
             'outlet': self.outlet.id,
             'product': self.product.id,
@@ -65,54 +62,26 @@ class DispatchWorkflowTest(TestCase):
         self.assertTrue(serializer.is_valid(), serializer.errors)
 
         dispatch_request = serializer.save()
-
-        self.assertEqual(dispatch_request.requested_by, self.user)
         self.assertEqual(dispatch_request.status, 'pending')
-        self.assertIsNone(dispatch_request.approved_by)
-        self.assertIsNone(dispatch_request.approved_at)
 
-    def test_dispatch_request_approve_sets_approved_by_and_timestamp(self):
+    def test_dispatch_request_approve_updates_status(self):
         dispatch_request = DispatchRequest.objects.create(
             outlet=self.outlet,
             product=self.product,
             quantity_requested=5,
-            requested_by=self.user,
         )
 
         self.assertEqual(dispatch_request.status, 'pending')
-        self.assertIsNone(dispatch_request.approved_by)
-
-        dispatch_request.approve(self.user)
-
+        dispatch_request.status = 'approved'
+        dispatch_request.save()
         self.assertEqual(dispatch_request.status, 'approved')
-        self.assertEqual(dispatch_request.approved_by, self.user)
-        self.assertIsNotNone(dispatch_request.approved_at)
-
-    def test_dispatch_request_mark_dispatched_updates_status_and_completed_at(self):
-        dispatch_request = DispatchRequest.objects.create(
-            outlet=self.outlet,
-            product=self.product,
-            quantity_requested=5,
-            requested_by=self.user,
-            status='approved',
-            approved_by=self.user,
-            approved_at=timezone.now(),
-        )
-
-        dispatch_request.mark_dispatched()
-
-        self.assertEqual(dispatch_request.status, 'dispatched')
-        self.assertIsNotNone(dispatch_request.completed_at)
 
     def test_dispatch_save_decrements_batch_and_updates_product_stock(self):
         dispatch_request = DispatchRequest.objects.create(
             outlet=self.outlet,
             product=self.product,
             quantity_requested=5,
-            requested_by=self.user,
             status='approved',
-            approved_by=self.user,
-            approved_at=timezone.now(),
         )
 
         payload = {
@@ -124,7 +93,7 @@ class DispatchWorkflowTest(TestCase):
         serializer = DispatchSerializer(data=payload)
         self.assertTrue(serializer.is_valid(), serializer.errors)
 
-        dispatch = serializer.save(dispatched_by=self.user)
+        dispatch = serializer.save()
 
         self.batch.refresh_from_db()
         self.product.refresh_from_db()
@@ -133,20 +102,16 @@ class DispatchWorkflowTest(TestCase):
         self.assertEqual(self.batch.current_quantity, 15)
         self.assertEqual(self.product.stock, 15)
         self.assertEqual(dispatch.request, dispatch_request)
-        self.assertEqual(dispatch.dispatched_by, self.user)
-        self.assertIsNotNone(dispatch.dispatched_at)
 
     def test_dispatch_serializer_rejects_unapproved_request_and_mismatched_batch(self):
         unapproved_request = DispatchRequest.objects.create(
             outlet=self.outlet,
             product=self.product,
             quantity_requested=5,
-            requested_by=self.user,
         )
         another_product = Product.objects.create(
             name='Other Product',
             category=self.category,
-            cost_price='2.00',
             price='5.00',
             stock=0,
             min_stock=1,

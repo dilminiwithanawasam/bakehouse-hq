@@ -6,6 +6,7 @@ file: backend/apps/products/models.py
 
 from django.db import models
 from django.core.validators import MinValueValidator
+from django.conf import settings
 from apps.core.models import TimeStampedModel
 from datetime import timedelta
 
@@ -59,6 +60,10 @@ class Product(TimeStampedModel):
 
     def __str__(self):
         return self.name
+
+    def update_stock_from_batches(self):
+        self.stock = sum(b.current_quantity or 0 for b in self.batches.filter(is_active=True))
+        self.save()
 
     @property
     def status(self):
@@ -114,19 +119,8 @@ class ProductBatch(TimeStampedModel):
         if not self.expiry_date and self.production_date and self.product:
             self.expiry_date = self.production_date + timedelta(days=self.product.shelf_life_days)
         super().save(*args, **kwargs)
-
-    class Meta:
-        db_table = 'products_batch'
-        ordering = ['expiry_date', 'created_at'] # Enforces FIFO data loops
-
-    def __str__(self):
-        return f"{self.product.name} - Batch {self.batch_number}"
-
-    def save(self, *args, **kwargs):
-        """Automates expiration formula calculations: Mfg Date + Shelf Life (SRS 4.4)"""
-        if not self.expiry_date and self.production_date and self.product:
-            self.expiry_date = self.production_date + timedelta(days=self.product.shelf_life_days)
-        super().save(*args, **kwargs)
+        if self.product:
+            self.product.update_stock_from_batches()
 
 
 class DispatchRequest(TimeStampedModel):
@@ -157,6 +151,16 @@ class Dispatch(TimeStampedModel):
         db_table = 'products_dispatch'
         ordering = ['-created_at']
 
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        if is_new and self.batch and self.quantity_dispatched:
+            if self.batch.current_quantity is not None:
+                self.batch.current_quantity -= self.quantity_dispatched
+                self.batch.save()
+            if self.batch.product:
+                self.batch.product.update_stock_from_batches()
+        super().save(*args, **kwargs)
+
 
 class StockAdjustment(TimeStampedModel):
     """Tracks data manipulation audits for inventory safety reporting."""
@@ -166,6 +170,12 @@ class StockAdjustment(TimeStampedModel):
     old_stock = models.IntegerField()
     new_stock = models.IntegerField()
     notes = models.TextField(null=True, blank=True)
+    adjusted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
 
     class Meta:
         db_table = 'products_stock_adjustment'

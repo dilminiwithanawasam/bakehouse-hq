@@ -77,7 +77,7 @@ function ExecutiveDashboard() {
   });
 
   // Safely extract data from the API response wrapper
-  const data = response?.data;
+  const data = response?.data || response;
 
   // Extract KPI metrics from today_stats with optional chaining
   const totalSalesToday = data?.today_stats?.sales?.total_revenue ?? 0;
@@ -421,7 +421,7 @@ function SalespersonDashboard() {
     queryFn: api.getDashboardData,
   });
 
-  const data = response?.data;
+  const data = response?.data || response;
   const totalSalesToday = data?.today_stats?.sales?.total_revenue ?? 0;
   const totalItemsToday = data?.today_stats?.sales?.transaction_count ?? 0;
   const lowStockCount = data?.today_stats?.stock?.low_stock_count ?? 0;

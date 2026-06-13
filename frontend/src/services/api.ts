@@ -208,14 +208,14 @@ export const listWastage = async (filters?: {
   return parseResponseData(response);
 };
 
-export const createWastage = async (data: WastagePayload): Promise<Wastage> => {
+export const createWastage = async (data: WastagePayload & { loss?: number }): Promise<Wastage> => {
   const payload = {
     date: data.date,
     product: data.productId,
-    batch: data.batchId,
+    batch: data.batchId || null,
     quantity: data.qty,
-    reason: data.reason,
-    unit_cost: data.unitCost,
+    reason: data.reason ? data.reason.toLowerCase() : "other",
+    unit_cost: data.unitCost !== undefined ? data.unitCost : (data.loss !== undefined ? data.loss : 0),
     notes: data.notes,
   };
 

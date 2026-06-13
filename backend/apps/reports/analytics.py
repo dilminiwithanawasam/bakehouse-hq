@@ -89,6 +89,86 @@ class DashboardAnalytics:
             change_percent = 0 if current_total == 0 else 100
         else:
             change_percent = ((current_total - prev_total) / prev_total) * 100
+
+        # Calculate Daily Trend (dates) for the last 14 days
+        十四days_ago = today - timedelta(days=13)
+        daily_sales = Sale.objects.filter(
+            date__gte=十四days_ago,
+            date__lte=today,
+            is_void=False
+        ).values('date').annotate(
+            revenue=Sum('total')
+        ).order_by('date')
+        
+        revenue_by_date = {}
+        for s in daily_sales:
+            d_key = s['date'].isoformat() if hasattr(s['date'], 'isoformat') else str(s['date'])
+            revenue_by_date[d_key] = float(s['revenue'] or 0)
+            
+        dates_list = []
+        for i in range(14):
+            d = 十四days_ago + timedelta(days=i)
+            d_str = d.isoformat()
+            dates_list.append({
+                'date': d.strftime('%b %d'),
+                'revenue': revenue_by_date.get(d_str, 0.0)
+            })
+
+        # Calculate Category mix (categories) for today (or fallback 14 days if today is empty)
+        from apps.sales.models import SaleItem
+        cat_sales = SaleItem.objects.filter(
+            sale__date__gte=current_start,
+            sale__date__lte=current_end,
+            sale__is_void=False
+        ).values('product__category__name').annotate(
+            total=Sum('line_total')
+        ).order_by('-total')
+        
+        categories_list = []
+        for cs in cat_sales:
+            name = cs['product__category__name'] or "Uncategorized"
+            categories_list.append({
+                'name': name,
+                'total': float(cs['total'] or 0)
+            })
+            
+        if not categories_list:
+            cat_sales_14 = SaleItem.objects.filter(
+                sale__date__gte=十四days_ago,
+                sale__date__lte=today,
+                sale__is_void=False
+            ).values('product__category__name').annotate(
+                total=Sum('line_total')
+            ).order_by('-total')
+            for cs in cat_sales_14:
+                name = cs['product__category__name'] or "Uncategorized"
+                categories_list.append({
+                    'name': name,
+                    'total': float(cs['total'] or 0)
+                })
+
+        # Calculate Hourly sales today (hourly)
+        today_sales_hourly = Sale.objects.filter(
+            date=today,
+            is_void=False
+        )
+        hourly_map = {h: 0.0 for h in range(6, 22)} # 6 AM to 9 PM
+        for sale in today_sales_hourly:
+            local_time = timezone.localtime(sale.created_at)
+            hour = local_time.hour
+            if hour in hourly_map:
+                hourly_map[hour] += float(sale.total or 0)
+                
+        hourly_list = []
+        for h in range(6, 22):
+            am_pm = "AM" if h < 12 else "PM"
+            display_hour = h if h <= 12 else h - 12
+            if display_hour == 0:
+                display_hour = 12
+            hourly_list.append({
+                'hour': f"{display_hour} {am_pm}",
+                'sales': hourly_map[h]
+            })
         
         return {
             'current_period': {
@@ -96,6 +176,9 @@ class DashboardAnalytics:
                 'end_date': current_end.isoformat(),
                 'total': current_total,
                 'transactions': current_sales.get('count') or 0,
+                'dates': dates_list,
+                'categories': categories_list,
+                'hourly': hourly_list
             },
             'previous_period': {
                 'start_date': prev_start.isoformat(),

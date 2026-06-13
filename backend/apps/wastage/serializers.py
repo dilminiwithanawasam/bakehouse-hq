@@ -104,8 +104,8 @@ class WastageCreateSerializer(serializers.ModelSerializer):
             reason='wastage',
             old_stock=old_stock,
             new_stock=product.stock,
-            wastage=wastage,
             adjusted_by=self.context['request'].user,
+            notes=f"Wastage #{wastage.reference_number}"
         )
         
         return wastage

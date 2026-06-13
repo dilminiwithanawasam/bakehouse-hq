@@ -1,6 +1,7 @@
 """
 Django settings for Bakery HQ project.
 Production-grade configuration with environment variables.
+file: backend/bakery_hq/settings.py
 """
 
 import os
@@ -8,13 +9,27 @@ from pathlib import Path
 from datetime import timedelta
 from decouple import config, Csv
 
+
+def config_bool(key, default=False):
+    try:
+        return config(key, default=default, cast=bool)
+    except ValueError:
+        return default
+
+
+def config_int(key, default=0):
+    try:
+        return config(key, default=default, cast=int)
+    except ValueError:
+        return default
+
 # Build paths
 BASE_DIR = Path(__file__).resolve().parent.parent
 PROJECT_ROOT = BASE_DIR.parent
 
 # Environment
 ENVIRONMENT = config('ENVIRONMENT', default='development')
-DEBUG = config('DEBUG', default=True, cast=bool)
+DEBUG = config_bool('DEBUG', default=True)
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-dev-key-change-in-production')
 
 # SECURITY SETTINGS
@@ -32,10 +47,21 @@ SECURE_CONTENT_SECURITY_POLICY = {
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = config(
     'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:5173,http://localhost:8080',
+    default='http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080,http://localhost:3000,http://127.0.0.1:3000',
     cast=Csv()
 )
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGIN_REGEXES = [r'^http://localhost:\d+$', r'^http://127\.0\.0\.1:\d+$']
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 CORS_ALLOW_METHODS = [
     'DELETE',
     'GET',
@@ -44,6 +70,13 @@ CORS_ALLOW_METHODS = [
     'POST',
     'PUT',
 ]
+
+# Development convenience: when DEBUG is enabled, allow all localhost origins
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+    CORS_ALLOW_CREDENTIALS = True
+else:
+    CORS_ALLOW_ALL_ORIGINS = False
 
 # Application definition
 INSTALLED_APPS = [
@@ -133,7 +166,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'Asia/Kolkata'
+TIME_ZONE = 'Asia/Colombo'
 USE_I18N = True
 USE_TZ = True
 
@@ -274,13 +307,37 @@ LOGGING = {
     },
 }
 
+if DEBUG:
+    LOGGING['handlers']['console']['level'] = 'DEBUG'
+
 # Create logs directory
 os.makedirs(BASE_DIR / 'logs', exist_ok=True)
 
 # Custom settings for the application
 APP_SETTINGS = {
-    'OUTLET_NAME': 'Sunrise Bakery — Bandra Outlet',
-    'CURRENCY': 'INR',
-    'CURRENCY_SYMBOL': '₹',
+    'OUTLET_NAME': 'BakeryHUB',
+    'CURRENCY': 'LKR',
+    'CURRENCY_SYMBOL': 'LKR',
 }
+
 AUTH_USER_MODEL = 'accounts.User'
+
+# 🌟 DYNAMIC PORTAL IDENTIFIER CONFIGURATION
+FRONTEND_URL = 'http://localhost:8080'
+
+# ============================================================
+# 📬 LIVE INTERNET EMAIL DISPATCH ENGINE (Gmail SMTP Integration)
+# ============================================================
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+
+# 1. 🚨 Action Required: Replace this with your own functional Gmail username address
+EMAIL_HOST_USER = 'dilminiwithanawasam1250@gmail.com'
+
+# 2. 🚨 Action Required: Replace this placeholder string with your unique 16-character Google App Password 
+# (Go to your Google Account -> Security -> 2-Step Verification -> App Passwords to generate this)
+EMAIL_HOST_PASSWORD = 'fwdn cxap xzgl fvms'
+
+DEFAULT_FROM_EMAIL = f"BakeryHUB Enterprise Security <{EMAIL_HOST_USER}>"

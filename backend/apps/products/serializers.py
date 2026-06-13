@@ -1,90 +1,72 @@
 """
-Serializers for products.
+Serializers for mapping product models into lightweight frontend JSON streams.
+file: backend/apps/products/serializers.py
 """
 
 from rest_framework import serializers
-from apps.products.models import Product, ProductCategory
+from apps.products.models import Product, ProductCategory, ProductBatch, Outlet, DispatchRequest, Dispatch
 
 
 class ProductCategorySerializer(serializers.ModelSerializer):
-    """Serializer for product categories."""
-    
     class Meta:
         model = ProductCategory
         fields = ['id', 'name', 'description', 'display_order', 'created_at']
-        read_only_fields = ['id', 'created_at']
 
 
 class ProductSerializer(serializers.ModelSerializer):
-    """Serializer for product representation."""
-    
     category_name = serializers.CharField(source='category.name', read_only=True)
-    status = serializers.SerializerMethodField()
+    status = serializers.CharField(read_only=True)
 
     class Meta:
         model = Product
         fields = [
-            'id', 'name', 'category', 'category_name',
-            'price', 'stock', 'min_stock', 'status',
-            'sku', 'barcode', 'description', 'image_url',
-            'is_active', 'last_stock_check', 'total_sold',
-            'total_wasted', 'created_at', 'updated_at',
+            'id', 'name', 'category', 'category_name', 'price', 'stock', 
+            'min_stock', 'status', 'sku', 'barcode', 'description', 
+            'image_url', 'is_active', 'total_sold', 'total_wasted', 'created_at'
         ]
-        read_only_fields = [
-            'id', 'total_sold', 'total_wasted',
-            'created_at', 'updated_at', 'last_stock_check',
-        ]
-
-    def get_status(self, obj):
-        """Get stock status."""
-        return obj.status
 
 
 class ProductCreateUpdateSerializer(serializers.ModelSerializer):
-    """Serializer for creating and updating products."""
-    
     class Meta:
         model = Product
-        fields = [
-            'name', 'category', 'price', 'stock', 'min_stock',
-            'sku', 'barcode', 'description', 'image_url', 'is_active',
-        ]
-
-    def validate_price(self, value):
-        """Validate price is positive."""
-        if value < 0:
-            raise serializers.ValidationError('Price cannot be negative.')
-        return value
-
-    def validate_stock(self, value):
-        """Validate stock is non-negative."""
-        if value < 0:
-            raise serializers.ValidationError('Stock cannot be negative.')
-        return value
-
-    def validate_min_stock(self, value):
-        """Validate min_stock is non-negative."""
-        if value < 0:
-            raise serializers.ValidationError('Minimum stock cannot be negative.')
-        return value
+        fields = ['name', 'category', 'price', 'stock', 'min_stock', 'sku', 'barcode', 'description', 'image_url', 'is_active']
 
 
 class ProductStockUpdateSerializer(serializers.Serializer):
-    """Serializer for updating product stock."""
-    
     stock = serializers.IntegerField(min_value=0)
-    reason = serializers.CharField(
-        max_length=50,
-        default='manual_adjustment',
-    )
-    notes = serializers.CharField(
-        required=False,
-        allow_blank=True,
-        max_length=500,
-    )
+    reason = serializers.CharField(max_length=50, default='manual_adjustment')
+    notes = serializers.CharField(required=False, allow_blank=True, max_length=500)
 
-    def validate_stock(self, value):
-        """Validate stock is non-negative."""
-        if value < 0:
-            raise serializers.ValidationError('Stock cannot be negative.')
-        return value
+
+class ProductBatchSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source='product.name', read_only=True)
+    outlet_name = serializers.CharField(source='outlet_assignment.name', read_only=True)
+
+    class Meta:
+        model = ProductBatch
+        fields = ['id', 'product', 'product_name', 'batch_number', 'production_date', 'expiry_date', 'quantity_produced', 'current_quantity', 'outlet_assignment', 'outlet_name', 'is_active']
+
+
+class OutletSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Outlet
+        fields = ['id', 'name', 'code', 'location', 'is_active']
+
+
+class DispatchRequestSerializer(serializers.ModelSerializer):
+    outlet_name = serializers.CharField(source='outlet.name', read_only=True)
+    product_name = serializers.CharField(source='product.name', read_only=True)
+
+    class Meta:
+        model = DispatchRequest
+        fields = ['id', 'outlet', 'outlet_name', 'product', 'product_name', 'quantity_requested', 'status', 'notes', 'created_at']
+
+
+class DispatchSerializer(serializers.ModelSerializer):
+    outlet_name = serializers.CharField(source='outlet.name', read_only=True)
+    product_name = serializers.CharField(source='batch.product.name', read_only=True)
+    batch_number = serializers.CharField(source='batch.batch_number', read_only=True)
+
+    class Meta:
+        model = Dispatch
+        fields = ['id', 'request', 'outlet', 'outlet_name', 'batch', 'batch_number', 'product_name', 'quantity_dispatched', 'driver_name', 'status', 'created_at']

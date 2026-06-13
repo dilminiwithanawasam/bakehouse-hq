@@ -18,6 +18,7 @@ import {
   Bell,
   Croissant,
   X,
+  Package,
 } from "lucide-react";
 import { useAuth, ROLE_LABEL } from "@/context/AuthContext";
 import type { Role } from "@/services/mockData";
@@ -74,6 +75,12 @@ const NAV: NavItem[] = [
     icon: Settings,
     roles: ["admin", "manager", "salesperson"],
   },
+  { 
+    to: "/app/products",  
+    label: "Products",     
+    icon: Package,    
+    roles: ["admin", "salesperson"] ,
+          },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {

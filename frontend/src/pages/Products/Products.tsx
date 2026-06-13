@@ -26,7 +26,9 @@ import {
   type ProductBatch,
 } from "@/services/api";
 
+
 export function ProductsManagementPage() {
+  
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState<"products" | "batches">("products");
 
@@ -164,7 +166,7 @@ export function ProductsManagementPage() {
       {/* LOCAL ERROR FEEDBACK ALERT DESK BLOCK (Guarantees visible feedback if things break) */}
       {validationError && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-center text-sm font-semibold shadow-sm animate-pulse">
-          <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0 text-red-500" />
+          <AlertCircle className="h-4 w-4 mr-2 shrink-0 text-red-500" />
           <span>{validationError}</span>
         </div>
       )}
@@ -286,6 +288,7 @@ export function ProductsManagementPage() {
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold text-slate-600">Target Product Line</Label>
                 <select
+                  title="Choose a product line"
                   className="w-full h-10 px-3 py-2 rounded-md border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all"
                   value={selectedProdId}
                   onChange={(e) => {

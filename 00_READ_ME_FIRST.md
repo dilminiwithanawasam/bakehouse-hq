@@ -33,6 +33,7 @@ python manage.py runserver
 
 ### Step 2: Start Frontend (Terminal 2)
 ```bash
+cd frontend
 npm install
 npm run dev
 ```
@@ -488,6 +489,7 @@ python manage.py runserver
 
 ### Terminal 2 (Frontend)  
 ```bash
+cd frontend
 npm install
 npm run dev
 ```

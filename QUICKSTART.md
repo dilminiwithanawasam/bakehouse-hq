@@ -22,6 +22,7 @@ python manage.py runserver 8000
 
 ### Frontend (Vite)
 ```bash
+cd frontend
 npm run dev -- --host 127.0.0.1 --port 5173
 ```
 - **App:** http://127.0.0.1:5173
@@ -99,9 +100,10 @@ Validates: Login → Products → Sale (with stock auto-decrement)
 
 ### Run Frontend Build
 ```bash
+cd frontend
 npm run build
 ```
-Outputs to `dist/` for production deployment
+Outputs to `frontend/dist/` for production deployment
 
 ---
 
@@ -134,8 +136,8 @@ Outputs to `dist/` for production deployment
 1. Create serializer in backend `apps/{module}/serializers.py`
 2. Create viewset in `apps/{module}/views.py`
 3. Add to `apps/{module}/urls.py`
-4. Add function to `src/lib/api-backend.ts`
-5. Export through `src/lib/api.ts`
+4. Add function to `frontend/src/services/api.ts`
+5. Export through the `api` object inside `frontend/src/services/api.ts`
 6. Use in frontend with `useQuery` / `useMutation`
 
 ### Modifying Backend Models

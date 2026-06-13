@@ -21,6 +21,7 @@ python manage.py runserver
 
 ### Terminal 2 - Start Frontend
 ```bash
+cd frontend
 npm install
 npm run dev
 ```
@@ -237,7 +238,7 @@ SALESPERSON ACCOUNT
 ```bash
 # Read SYSTEM_ARCHITECTURE.md
 # Modify backend/apps/ for new features
-# Modify src/ for UI changes
+# Modify frontend/src/ for UI changes
 # Use Quick Start to test
 ```
 

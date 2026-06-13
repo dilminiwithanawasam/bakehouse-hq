@@ -20,6 +20,7 @@ python manage.py runserver
 
 ### Terminal 2 - Frontend
 ```bash
+cd frontend
 npm install
 npm run dev
 ```
@@ -101,9 +102,11 @@ python manage.py startapp app_name
 python manage.py shell
 ```
 
-### Frontend Commands
+### Frontend Commands (Run inside frontend/ directory)
 
 ```bash
+cd frontend
+
 # Install dependencies
 npm install
 
@@ -232,24 +235,16 @@ bakery-hq/
 │   │   └── core/              # Shared
 │   └── bakery_hq/             # Settings
 │
-├── src/                       # React Frontend
-│   ├── routes/                # Pages
-│   │   ├── app.dashboard.tsx
-│   │   ├── app.sales.tsx
-│   │   ├── app.products.tsx
-│   │   ├── app.wastage.tsx
-│   │   ├── app.reports.tsx
-│   │   ├── app.users.tsx
-│   │   └── ...
-│   ├── components/            # Components
-│   ├── lib/                  # Utils & API
-│   └── styles.css            # Styles
-│
-├── dist/                      # Build output
-├── .env.local                # Frontend config
-├── package.json              # Frontend packages
-├── vite.config.ts            # Vite config
-├── tsconfig.json             # TypeScript config
+├── frontend/                   # React Frontend
+│   ├── src/                    # Source code
+│   │   ├── routes/             # Thin routes (app.dashboard.tsx, etc.)
+│   │   ├── pages/              # Reusable page views
+│   │   ├── components/         # UI components
+│   │   ├── services/           # API and data services
+│   │   └── context/            # Authentication context
+│   ├── package.json            # Frontend packages
+│   ├── tsconfig.json           # TypeScript config
+│   └── vite.config.ts          # Vite config
 │
 └── Documentation/
     ├── START_HERE.md         ← Begin here
@@ -319,7 +314,7 @@ Check:
 Solution:
 - Kill port 5173: taskkill /PID <pid> /F
 - Or use different port: npm run dev -- --port 3000
-- Clear node_modules: rmdir node_modules /s /q && npm install
+- Clear node_modules: cd frontend && rmdir node_modules /s /q && npm install
 ```
 
 ### Problem: Can't login
@@ -371,14 +366,14 @@ Solution:
 
 | Item | Location |
 |------|----------|
-| Frontend app | `/src/` |
+| Frontend app | `/frontend/src/` |
 | Backend app | `/backend/apps/` |
 | Database | `/backend/db.sqlite3` |
 | Backend config | `/backend/.env` |
-| Frontend config | `/.env.local` |
+| Frontend config | `/frontend/package.json` |
 | Documentation | `/*.md` files |
-| TypeScript config | `/tsconfig.json` |
-| Vite config | `/vite.config.ts` |
+| TypeScript config | `/frontend/tsconfig.json` |
+| Vite config | `/frontend/vite.config.ts` |
 | Django settings | `/backend/bakery_hq/settings.py` |
 
 ---

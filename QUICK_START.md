@@ -43,6 +43,7 @@ python manage.py runserver
 
 ### Step 2: Frontend (Terminal 2)
 ```bash
+cd frontend
 npm install
 npm run dev
 ```
@@ -104,9 +105,10 @@ For complete project details: **See PROJECT_COMPLETION_REPORT.md**
 - `backend/db.sqlite3` - Database (auto-created)
 
 **Frontend:**
-- `src/` - React application code
-- `src/routes/` - Different pages
-- `src/components/` - UI components
+- `frontend/src/` - React application code
+- `frontend/src/routes/` - Different routes (thin routes wrapper)
+- `frontend/src/pages/` - Reusable page views (Dashboard, Sales, etc.)
+- `frontend/src/components/` - UI components (common, layout, ui)
 
 ---
 

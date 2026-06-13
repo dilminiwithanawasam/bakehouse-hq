@@ -190,13 +190,13 @@ The frontend is like the restaurant's dining room where customers see and intera
 2. Type: `cmd`
 3. Press Enter
 
-### Step 4.2: Navigate to the Project Root
+### Step 4.2: Navigate to the Frontend Folder
 
 1. Type:
    ```
-   cd C:\bakery-hq
+   cd C:\bakery-hq\frontend
    ```
-   (or wherever you extracted the project, but do NOT go into the `backend` folder)
+   (or navigate to the `frontend` folder inside your extracted project)
 2. Press Enter
 
 ### Step 4.3: Install Frontend Dependencies
@@ -290,7 +290,7 @@ The next time you want to use Bakery HQ:
 
 ### Restart Frontend:
 1. Open a NEW Command Prompt
-2. Type: `cd C:\bakery-hq`
+2. Type: `cd C:\bakery-hq\frontend`
 3. Type: `npm run dev`
 
 Then open browser to: `http://localhost:5173`
@@ -386,12 +386,11 @@ bakery-hq/
 │   ├── db.sqlite3             ← Database with all data
 │   └── apps/                  ← Business logic
 │
-├── src/                        ← React/JavaScript frontend
-│   ├── routes/                ← Different pages (Dashboard, Sales, etc.)
-│   └── components/            ← Reusable parts (Buttons, Tables, etc.)
+├── frontend/                   ← React/JavaScript frontend
+│   ├── src/                    ← Source code (thin routes, pages, components, context, etc.)
+│   ├── package.json            ← Frontend configuration
+│   └── vite.config.ts          ← Frontend build configuration
 │
-├── package.json               ← Frontend configuration
-├── .env.local                 ← Frontend settings
 └── README.md                  ← Detailed documentation
 ```
 
@@ -414,7 +413,7 @@ bakery-hq/
    python manage.py seed_data
    python manage.py runserver
    ```
-6. ✅ Open NEW Command Prompt in project root folder
+6. ✅ Open NEW Command Prompt in the `frontend` folder (`cd C:\bakery-hq\frontend`)
 7. ✅ Run:
    ```
    npm install

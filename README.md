@@ -8,8 +8,8 @@ A fullstack bakery management app with Django DRF backend and React + Vite front
 - Frontend: React + Vite + TypeScript + TanStack Router.
 - Verified:
   - `python manage.py test` ✅
-  - `npm run build` ✅
-  - `npx eslint src --max-warnings=0` ✅
+  - `cd frontend && npm run build` ✅
+  - `cd frontend && npm run lint` ✅
 
 ## Installation
 
@@ -26,7 +26,7 @@ python manage.py migrate
 ### Frontend
 
 ```powershell
-cd ..
+cd frontend
 npm install
 ```
 
@@ -43,7 +43,7 @@ python manage.py runserver
 ### Start frontend
 
 ```powershell
-cd ..
+cd frontend
 npm run dev
 ```
 
@@ -62,15 +62,15 @@ python manage.py test
 ### Frontend lint
 
 ```powershell
-cd ..
-npx eslint src --max-warnings=0
+cd frontend
+npm run lint
 ```
 
 ### Frontend formatting
 
 ```powershell
-cd ..
-npx prettier --write src
+cd frontend
+npm run format
 ```
 
 ## Notable files
@@ -78,8 +78,8 @@ npx prettier --write src
 - `backend/apps/products/models.py` — dispatch and inventory behavior
 - `backend/apps/products/serializers.py` — dispatch/dispatch request serializers
 - `backend/apps/products/views.py` — dispatch endpoints
-- `src/routes/app.index.tsx` — route redirect component
-- `eslint.config.js` — frontend lint configuration
+- `frontend/src/routes/app.index.tsx` — route redirect component
+- `frontend/eslint.config.js` — frontend lint configuration
 
 ## Notes
 

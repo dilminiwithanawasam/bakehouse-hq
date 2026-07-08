@@ -3,10 +3,32 @@ import { useRouter } from "@tanstack/react-router";
 import { useAuth } from "@/context/AuthContext";
 import type { Role } from "@/services/mockData";
 import { Skeleton } from "@/components/ui/skeleton";
+import { hasPermission, type Permission } from "@/lib/permissions";
 
-export function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?: Role[] }) {
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  roles?: Role[];
+  permissions?: Permission[];
+  fallbackPath?: string;
+  requireAll?: boolean;
+}
+
+export function ProtectedRoute({
+  children,
+  roles,
+  permissions,
+  fallbackPath = "/unauthorized",
+  requireAll = true,
+}: ProtectedRouteProps) {
   const { user, loading } = useAuth();
   const router = useRouter();
+
+  const roleAllowed = roles ? roles.includes(user?.role as Role) : true;
+  const permissionAllowed = permissions
+    ? requireAll
+      ? permissions.every((permission) => hasPermission(user?.role as Role | null, permission))
+      : permissions.some((permission) => hasPermission(user?.role as Role | null, permission))
+    : true;
 
   useEffect(() => {
     if (loading) return;
@@ -14,10 +36,10 @@ export function ProtectedRoute({ children, roles }: { children: React.ReactNode;
       router.navigate({ to: "/login" });
       return;
     }
-    if (roles && !roles.includes(user.role)) {
-      router.navigate({ to: "/unauthorized" });
+    if (!roleAllowed || !permissionAllowed) {
+      router.navigate({ to: fallbackPath });
     }
-  }, [user, loading, roles, router]);
+  }, [user, loading, roleAllowed, permissionAllowed, router, fallbackPath]);
 
   if (loading || !user) {
     return (
@@ -32,6 +54,6 @@ export function ProtectedRoute({ children, roles }: { children: React.ReactNode;
       </div>
     );
   }
-  if (roles && !roles.includes(user.role)) return null;
+  if (!roleAllowed || !permissionAllowed) return null;
   return <>{children}</>;
 }

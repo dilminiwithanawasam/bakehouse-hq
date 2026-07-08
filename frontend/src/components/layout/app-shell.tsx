@@ -7,18 +7,11 @@
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 import {
-  LayoutDashboard,
-  ShoppingCart,
-  Trash2,
-  Boxes,
-  Users,
-  Settings,
   LogOut,
   Menu,
   Bell,
   Croissant,
   X,
-  Package,
 } from "lucide-react";
 import { useAuth, ROLE_LABEL } from "@/context/AuthContext";
 import type { Role } from "@/services/mockData";
@@ -34,54 +27,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/utils/utils";
-
-interface NavItem {
-  to: string;
-  label: string;
-  icon: typeof LayoutDashboard;
-  roles: Role[];
-}
-
-// Navigation Layout Array Configuration
-const NAV: NavItem[] = [
-  {
-    to: "/app/dashboard",
-    label: "Dashboard",
-    icon: LayoutDashboard,
-    roles: ["admin", "manager", "salesperson"],
-  },
-  {
-    to: "/app/sales",
-    label: "Sales Entry",
-    icon: ShoppingCart,
-    roles: ["admin", "manager", "salesperson"],
-  },
-  {
-    to: "/app/wastage",
-    label: "Wastage",
-    icon: Trash2,
-    roles: ["admin", "manager", "salesperson"],
-  },
-  {
-    to: "/app/stock",
-    label: "Stock Counting",
-    icon: Boxes,
-    roles: ["admin", "manager", "salesperson"],
-  },
-  { to: "/app/users", label: "User Management", icon: Users, roles: ["admin"] },
-  {
-    to: "/app/settings",
-    label: "Settings",
-    icon: Settings,
-    roles: ["admin", "manager", "salesperson"],
-  },
-  { 
-    to: "/app/products",  
-    label: "Products",     
-    icon: Package,    
-    roles: ["admin", "salesperson"] ,
-          },
-];
+import { APP_NAV_ITEMS, hasAnyPermission, type NavItemDefinition } from "@/lib/permissions";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
@@ -90,8 +36,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   if (!user) return null;
 
-  // Filter items according to session token role configurations (RBAC)
-  const items = NAV.filter((n) => n.roles.includes(user.role));
+  // Filter items according to the centralized permission model.
+  const items = APP_NAV_ITEMS.filter((item) =>
+    hasAnyPermission(user?.role as Role | null, item.permissions),
+  );
   const handleLogout = () => {
     logout();
     router.navigate({ to: "/login" });
@@ -223,7 +171,7 @@ function SidebarContent({
   pathname,
   onNavigate,
 }: {
-  items: NavItem[];
+  items: NavItemDefinition[];
   pathname: string;
   onNavigate?: () => void;
 }) {

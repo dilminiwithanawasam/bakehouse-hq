@@ -28,13 +28,15 @@ import { Separator } from "@/components/ui/separator";
 import { currency } from "@/services/mockData";
 import { api, type Product, type ProductBatch } from "@/services/api";
 import { useAuth } from "@/context/AuthContext";
+import { usePermission } from "@/hooks/use-permission";
+import { PERMISSIONS } from "@/lib/permissions";
 
 interface LineItem {
   id: string;
   productId: string;
-  productName: string; // Saved explicitly to preserve historical rows if selection switches items
+  productName: string; 
   batchId: string;
-  batchNumber: string; // Saved explicitly to preserve historical rows if selection switches items
+  batchNumber: string;
   qty: number;
   unitPrice: number;
 }
@@ -49,6 +51,7 @@ const lineSchema = z.object({
 export function SalesPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const canCreateSale = usePermission(PERMISSIONS.SALES_CREATE);
 
   // Fetch active catalogs from the backend system database
   const {
@@ -60,7 +63,7 @@ export function SalesPage() {
   const [items, setItems] = useState<LineItem[]>([]);
   const [productId, setProductId] = useState("");
   const [batchId, setBatchId] = useState("");
-  const [qty, setQty] = useState(1);
+  const [qty, setQty] = useState("");
 
   const product = products.find((p: any) => String(p.id) === productId);
 
@@ -81,14 +84,14 @@ export function SalesPage() {
 
   const grandTotal = items.reduce((s, i) => s + i.qty * i.unitPrice, 0);
   const tax = Math.round(grandTotal * 0.05);
-
+  const quantity = Number(qty);
   const addItem = () => {
     const currentBatch = batches.find((b) => String(b.id) === batchId);
 
     const parsed = lineSchema.safeParse({
       productId,
       batchId,
-      qty,
+      qty: quantity,
       unitPrice: Number((product as any)?.price ?? 0),
     });
 
@@ -98,7 +101,7 @@ export function SalesPage() {
     }
 
     // Enforce strict inventory constraint limits
-    if (qty > currentBatch.current_quantity) {
+    if (quantity > currentBatch.current_quantity) {
       toast.error(
         `Insufficient inventory. This batch only has ${currentBatch.current_quantity} available.`,
       );
@@ -112,7 +115,7 @@ export function SalesPage() {
 
     if (existingIndex > -1) {
       const updatedItems = [...items];
-      const testQty = updatedItems[existingIndex].qty + qty;
+      const testQty = updatedItems[existingIndex].qty + quantity;
 
       if (testQty > currentBatch.current_quantity) {
         toast.error(
@@ -133,7 +136,7 @@ export function SalesPage() {
           productName: product.name,
           batchId,
           batchNumber: currentBatch.batch_number,
-          qty,
+          qty: quantity,
           unitPrice: product.price,
         },
       ]);
@@ -143,7 +146,7 @@ export function SalesPage() {
     // Revert form state elements for subsequent inputs
     setProductId("");
     setBatchId("");
-    setQty(1);
+    setQty("");
   };
 
   const removeItem = (id: string) => setItems((p) => p.filter((i) => i.id !== id));
@@ -259,7 +262,7 @@ export function SalesPage() {
                   type="number"
                   min={1}
                   value={qty}
-                  onChange={(e) => setQty(Math.max(1, Number(e.target.value || 1)))}
+                  onChange={(e) => setQty(e.target.value)}
                 />
               </div>
 
@@ -268,8 +271,8 @@ export function SalesPage() {
                 <Label>Unit price</Label>
                 <Input value={product ? currency(product.price) : "—"} disabled />
               </div>
-
-              <Button onClick={addItem} className="h-10">
+              
+              <Button onClick={addItem} className="h-10" disabled={!canCreateSale}>
                 <Plus className="h-4 w-4 mr-1" />
                 Add
               </Button>
@@ -353,7 +356,7 @@ export function SalesPage() {
           <Button
             className="w-full mt-5 h-11 text-white font-extrabold"
             onClick={() => save.mutate()}
-            disabled={save.isPending || items.length === 0}
+            disabled={save.isPending || items.length === 0 || !canCreateSale}
           >
             {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save sale"}
           </Button>

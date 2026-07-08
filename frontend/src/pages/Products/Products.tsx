@@ -25,10 +25,12 @@ import {
   type Product,
   type ProductBatch,
 } from "@/services/api";
-
+import { usePermission } from "@/hooks/use-permission";
+import { PERMISSIONS } from "@/lib/permissions";
 
 export function ProductsManagementPage() {
-  
+  const canCreateProduct = usePermission(PERMISSIONS.PRODUCT_CREATE);
+  const canCreateBatch = usePermission(PERMISSIONS.BATCH_CREATE);
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState<"products" | "batches">("products");
 
@@ -61,6 +63,9 @@ export function ProductsManagementPage() {
   const addProductMutation = useMutation({
     mutationFn: async () => {
       setValidationError(null);
+      if (!canCreateProduct) {
+        throw new Error("You do not have permission to create products.");
+      }
       if (!prodName.trim() || !prodPrice) {
         throw new Error("Form incomplete: Please fill out the item name and selling price.");
       }
@@ -90,6 +95,9 @@ export function ProductsManagementPage() {
   const addBatchMutation = useMutation({
     mutationFn: async () => {
       setValidationError(null);
+      if (!canCreateBatch) {
+        throw new Error("You do not have permission to create batches.");
+      }
 
       // Explicit manual check validation rules
       if (!selectedProdId || selectedProdId === "") {
@@ -179,12 +187,18 @@ export function ProductsManagementPage() {
               <Plus className="h-4 w-4 mr-1 text-amber-600" /> Add New Product Profile
             </h3>
             <div className="space-y-4">
+              {!canCreateProduct ? (
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-700">
+                  You do not have permission to create product profiles.
+                </div>
+              ) : null}
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold text-slate-600">Product Name</Label>
                 <Input
                   placeholder="e.g., Chocolate Roll, White Sandwich Bread"
                   value={prodName}
                   onChange={(e) => setProdName(e.target.value)}
+                  disabled={!canCreateProduct}
                 />
               </div>
               <div className="space-y-1.5">
@@ -196,6 +210,7 @@ export function ProductsManagementPage() {
                   placeholder="650.00"
                   value={prodPrice}
                   onChange={(e) => setProdPrice(e.target.value)}
+                  disabled={!canCreateProduct}
                 />
               </div>
               <div className="space-y-1.5">
@@ -206,6 +221,7 @@ export function ProductsManagementPage() {
                   type="number"
                   value={shelfLife}
                   onChange={(e) => setShelfLife(e.target.value)}
+                  disabled={!canCreateProduct}
                 />
               </div>
               <Button
@@ -215,7 +231,7 @@ export function ProductsManagementPage() {
                   setValidationError(null);
                   addProductMutation.mutate();
                 }}
-                disabled={addProductMutation.isPending}
+                disabled={addProductMutation.isPending || !canCreateProduct}
               >
                 {addProductMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -231,14 +247,14 @@ export function ProductsManagementPage() {
             <Table>
               <TableHeader className="bg-slate-50">
                 <TableRow>
-                  <TableHead className="font-bold text-slate-700">Product Blueprint Name</TableHead>
+                  <TableHead className="font-bold text-slate-700">Product  Name</TableHead>
                   <TableHead className="text-right font-bold text-slate-700">
                     Retail Value Price
                   </TableHead>
                   <TableHead className="text-right font-bold text-slate-700">
-                    Live Consolidated Stock
+                    Stock Balance Quantity
                   </TableHead>
-                  <TableHead className="font-bold text-slate-700">State Status</TableHead>
+                  
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -265,11 +281,7 @@ export function ProductsManagementPage() {
                     <TableCell className="text-right font-bold text-amber-700">
                       {p.stock} units
                     </TableCell>
-                    <TableCell>
-                      <span className="text-xs font-bold bg-green-50 text-green-700 border border-green-100 px-2 py-0.5 rounded-full">
-                        Live Core App
-                      </span>
-                    </TableCell>
+                    
                   </TableRow>
                 ))}
               </TableBody>
@@ -284,6 +296,11 @@ export function ProductsManagementPage() {
               <Plus className="h-4 w-4 mr-1 text-amber-600" /> Log Daily Production Run
             </h3>
             <div className="space-y-4">
+              {!canCreateBatch ? (
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-700">
+                  You do not have permission to create production batches.
+                </div>
+              ) : null}
               {/* 🌟 UNBREAKABLE NATIVE SELECT DROPDOWN ELEMENT CONTAINER */}
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold text-slate-600">Target Product Line</Label>
@@ -291,6 +308,7 @@ export function ProductsManagementPage() {
                   title="Choose a product line"
                   className="w-full h-10 px-3 py-2 rounded-md border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all"
                   value={selectedProdId}
+                  disabled={!canCreateBatch}
                   onChange={(e) => {
                     console.log("NATIVE DROPDOWN SELECT CHOICE TOGGLED:", e.target.value);
                     setSelectedProdId(e.target.value);
@@ -308,11 +326,13 @@ export function ProductsManagementPage() {
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold text-slate-600">
-                  Batch Control String Reference Number
+                  Batch Number
+                
                 </Label>
                 <Input
                   placeholder="e.g., BATCH-2026-001"
                   value={batchNumber}
+                  disabled={!canCreateBatch}
                   onChange={(e) => {
                     setBatchNumber(e.target.value);
                     setValidationError(null);
@@ -321,12 +341,13 @@ export function ProductsManagementPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold text-slate-600">
-                  Baking Output Quantity Yield Volume
+                  Qunatity Produced (Units)
                 </Label>
                 <Input
                   type="number"
                   placeholder="50"
                   value={qtyProduced}
+                  disabled={!canCreateBatch}
                   onChange={(e) => {
                     setQtyProduced(e.target.value);
                     setValidationError(null);
@@ -337,7 +358,12 @@ export function ProductsManagementPage() {
                 <Label className="text-xs font-bold text-slate-600">
                   Kitchen Manufacturing Date
                 </Label>
-                <Input type="date" value={prodDate} onChange={(e) => setProdDate(e.target.value)} />
+                <Input
+                  type="date"
+                  value={prodDate}
+                  disabled={!canCreateBatch}
+                  onChange={(e) => setProdDate(e.target.value)}
+                />
               </div>
 
               {/* 🌟 DIRECT LINK ACTION TRIGGER EXECUTION TRIGGER BUTTON */}
@@ -349,7 +375,7 @@ export function ProductsManagementPage() {
                   setValidationError(null);
                   addBatchMutation.mutate();
                 }}
-                disabled={addBatchMutation.isPending}
+                disabled={addBatchMutation.isPending || !canCreateBatch}
               >
                 {addBatchMutation.isPending ? (
                   <div className="flex items-center justify-center">

@@ -157,11 +157,19 @@ export const listSales = async (filters?: {
   start_date?: string;
   end_date?: string;
   cashier?: string;
+  product?: string;
+  category?: string;
+  batch?: string;
+  salesperson?: string;
 }): Promise<Sale[]> => {
   const params = new URLSearchParams();
   if (filters?.start_date) params.append("date__gte", filters.start_date);
   if (filters?.end_date) params.append("date__lte", filters.end_date);
   if (filters?.cashier) params.append("cashier", filters.cashier);
+  if (filters?.product) params.append("product", filters.product);
+  if (filters?.category) params.append("category", filters.category);
+  if (filters?.batch) params.append("batch", filters.batch);
+  if (filters?.salesperson) params.append("salesperson", filters.salesperson);
 
   const response = await apiClient.get("/sales/", { params });
   return parseResponseData(response);
@@ -265,8 +273,19 @@ export const updateStock = async (id: string, newStock: number): Promise<Product
 // DASHBOARD API
 // ============================================================
 
-export const getDashboardData = async () => {
-  const response = await apiClient.get("/reports/dashboard/");
+export const getDashboardData = async (filters?: {
+  start_date?: string;
+  end_date?: string;
+  product?: string;
+  category?: string;
+}) => {
+  const params = new URLSearchParams();
+  if (filters?.start_date) params.append("start_date", filters.start_date);
+  if (filters?.end_date) params.append("end_date", filters.end_date);
+  if (filters?.product) params.append("product", filters.product);
+  if (filters?.category) params.append("category", filters.category);
+
+  const response = await apiClient.get("/reports/dashboard/", { params });
   return response.data.data || response.data;
 };
 
@@ -274,19 +293,31 @@ export const getDashboardData = async () => {
 // REPORTS API
 // ============================================================
 
-export const getSalesReport = async (startDate?: string, endDate?: string) => {
+export const getSalesReport = async (
+  startDate?: string,
+  endDate?: string,
+  filters?: { product?: string; category?: string },
+) => {
   const params = new URLSearchParams();
   if (startDate) params.append("start_date", startDate);
   if (endDate) params.append("end_date", endDate);
+  if (filters?.product && filters.product !== "all") params.append("product", filters.product);
+  if (filters?.category && filters.category !== "all") params.append("category", filters.category);
 
   const response = await apiClient.get("/reports/sales/", { params });
   return response.data.data || response.data;
 };
 
-export const getSalesReportPdf = async (startDate?: string, endDate?: string) => {
+export const getSalesReportPdf = async (
+  startDate?: string,
+  endDate?: string,
+  filters?: { product?: string; category?: string },
+) => {
   const params = new URLSearchParams();
   if (startDate) params.append("start_date", startDate);
   if (endDate) params.append("end_date", endDate);
+  if (filters?.product && filters.product !== "all") params.append("product", filters.product);
+  if (filters?.category && filters.category !== "all") params.append("category", filters.category);
 
   const response = await apiClient.get("/reports/sales/pdf/", {
     params,
@@ -295,10 +326,16 @@ export const getSalesReportPdf = async (startDate?: string, endDate?: string) =>
   return response.data;
 };
 
-export const getWastageReport = async (startDate?: string, endDate?: string) => {
+export const getWastageReport = async (
+  startDate?: string,
+  endDate?: string,
+  filters?: { product?: string; category?: string },
+) => {
   const params = new URLSearchParams();
   if (startDate) params.append("start_date", startDate);
   if (endDate) params.append("end_date", endDate);
+  if (filters?.product && filters.product !== "all") params.append("product", filters.product);
+  if (filters?.category && filters.category !== "all") params.append("category", filters.category);
 
   const response = await apiClient.get("/reports/wastage/", { params });
   return response.data.data || response.data;

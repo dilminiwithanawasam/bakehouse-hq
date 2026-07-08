@@ -247,14 +247,14 @@ export function ProductsManagementPage() {
             <Table>
               <TableHeader className="bg-slate-50">
                 <TableRow>
-                  <TableHead className="font-bold text-slate-700">Product Blueprint Name</TableHead>
+                  <TableHead className="font-bold text-slate-700">Product  Name</TableHead>
                   <TableHead className="text-right font-bold text-slate-700">
                     Retail Value Price
                   </TableHead>
                   <TableHead className="text-right font-bold text-slate-700">
-                    Live Consolidated Stock
+                    Stock Balance Quantity
                   </TableHead>
-                  <TableHead className="font-bold text-slate-700">State Status</TableHead>
+                  
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -281,11 +281,7 @@ export function ProductsManagementPage() {
                     <TableCell className="text-right font-bold text-amber-700">
                       {p.stock} units
                     </TableCell>
-                    <TableCell>
-                      <span className="text-xs font-bold bg-green-50 text-green-700 border border-green-100 px-2 py-0.5 rounded-full">
-                        Live Core App
-                      </span>
-                    </TableCell>
+                    
                   </TableRow>
                 ))}
               </TableBody>
@@ -330,7 +326,8 @@ export function ProductsManagementPage() {
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold text-slate-600">
-                  Batch Control String Reference Number
+                  Batch Number
+                
                 </Label>
                 <Input
                   placeholder="e.g., BATCH-2026-001"
@@ -344,7 +341,7 @@ export function ProductsManagementPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold text-slate-600">
-                  Baking Output Quantity Yield Volume
+                  Qunatity Produced (Units)
                 </Label>
                 <Input
                   type="number"

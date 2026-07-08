@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -28,6 +28,8 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 import { api } from "@/services/api";
 import { currency } from "@/services/mockData";
 
@@ -36,24 +38,50 @@ export function ReportsPage() {
   const [to, setTo] = useState("");
   const [product, setProduct] = useState("all");
   const [cat, setCat] = useState("all");
+  const reportRef = useRef<HTMLDivElement>(null);
 
-  const { data: dashboard } = useQuery({ queryKey: ["dashboard"], queryFn: api.getDashboardData });
+  const reportFilters = useMemo(
+    () => ({
+      start_date: from || undefined,
+      end_date: to || undefined,
+      product: product === "all" ? undefined : product,
+      category: cat === "all" ? undefined : cat,
+    }),
+    [from, to, product, cat],
+  );
+
+  const { data: dashboard } = useQuery({
+    queryKey: ["reports", "dashboard", from, to, product, cat],
+    queryFn: () => api.getDashboardData(reportFilters),
+  });
   const { data: salesReport } = useQuery({
-    queryKey: ["reports", "sales", from, to],
-    queryFn: () => api.getSalesReport(from || undefined, to || undefined),
+    queryKey: ["reports", "sales", from, to, product, cat],
+    queryFn: () => api.getSalesReport(reportFilters.start_date, reportFilters.end_date, { product: reportFilters.product, category: reportFilters.category }),
   });
   const { data: wastageReport } = useQuery({
-    queryKey: ["reports", "wastage", from, to],
-    queryFn: () => api.getWastageReport(from || undefined, to || undefined),
+    queryKey: ["reports", "wastage", from, to, product, cat],
+    queryFn: () => api.getWastageReport(reportFilters.start_date, reportFilters.end_date, { product: reportFilters.product, category: reportFilters.category }),
   });
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
     queryFn: () => api.listProducts(),
   });
   const { data: recentSales = [] } = useQuery({
-    queryKey: ["sales", "recent"],
-    queryFn: () => api.listSales(),
+    queryKey: ["sales", "recent", from, to, product, cat],
+    queryFn: () => api.listSales(reportFilters),
   });
+
+  const categories = useMemo(() => {
+    const options = new Map<string, string>();
+    products.forEach((p: any) => {
+      const value = p.category ?? p.category_id ?? p.categoryId;
+      const label = p.category_name || p.categoryName || p.category || "Uncategorized";
+      if (value !== undefined && value !== null && !options.has(String(value))) {
+        options.set(String(value), String(label));
+      }
+    });
+    return Array.from(options.entries()).map(([value, label]) => ({ value, label }));
+  }, [products]);
 
   const topProducts = (dashboard?.top_products || []).map((p: any) => ({
     id: p.product__id || p.product_id || p.id,
@@ -71,43 +99,54 @@ export function ReportsPage() {
     .map((p: any) => ({ name: p.name, sold: p.sold, wasted: wastageByProduct[p.id] || 0 }))
     .slice(0, 8);
 
-  const download = async (kind: string) => {
+  const summaryStats = useMemo(() => {
+    const revenue = (salesReport?.by_date || []).reduce((sum: number, item: any) => sum + Number(item.total_revenue || 0), 0);
+    const transactions = (salesReport?.by_date || []).reduce((sum: number, item: any) => sum + Number(item.transaction_count || 0), 0);
+    const wastageLoss = (wastageReport?.trend || []).reduce((sum: number, item: any) => sum + Number(item.total_loss || 0), 0);
+    const topProduct = topProducts[0];
+
+    return {
+      revenue,
+      transactions,
+      wastageLoss,
+      topProduct: topProduct?.name || "No sales yet",
+    };
+  }, [salesReport, wastageReport, topProducts]);
+
+  const exportPdf = async () => {
     try {
-      if (kind === "CSV") {
-        const rows = (salesReport?.by_date || []).map((d: any) => ({
-          date: d.date,
-          revenue: d.total_revenue || d.total || 0,
-          orders: d.transaction_count || d.transaction_count || 0,
-        }));
-        const header = ["date", "revenue", "orders"];
-        const csv = [header.join(",")]
-          .concat(rows.map((r: any) => [r.date, r.revenue, r.orders].join(",")))
-          .join("\n");
-        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `sales-report-${from || "all"}-${to || "all"}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-        toast.success("CSV download ready");
-        return;
+      if (!reportRef.current) {
+        throw new Error("Report content unavailable");
       }
 
-      const pdfBlob = await api.getSalesReportPdf(from || undefined, to || undefined);
-      const url = URL.createObjectURL(pdfBlob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `sales-report-${from || "all"}-${to || "all"}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+      });
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth - 40;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let remainingHeight = imgHeight;
+      let position = 20;
+
+      pdf.addImage(imgData, "PNG", 20, position, imgWidth, imgHeight);
+      remainingHeight -= pageHeight - 40;
+
+      while (remainingHeight > 0) {
+        pdf.addPage();
+        position = 20 - (pageHeight - 40) * (1 + Math.floor((imgHeight - remainingHeight) / (pageHeight - 40)));
+        pdf.addImage(imgData, "PNG", 20, position, imgWidth, imgHeight);
+        remainingHeight -= pageHeight - 40;
+      }
+
+      pdf.save(`sales-report-${from || "all"}-${to || "all"}.pdf`);
       toast.success("PDF download ready");
     } catch (e: any) {
-      toast.error(e?.message || "Failed to prepare download");
+      toast.error(e?.message || "Failed to prepare PDF");
     }
   };
 
@@ -118,7 +157,7 @@ export function ReportsPage() {
         description="Cross-cut your operations with date, product and category filters."
         actions={
           <>
-            <Button size="sm" onClick={() => download("Report")}>
+            <Button size="sm" onClick={exportPdf}>
               <Download className="h-4 w-4 mr-2" />
               Generate Report PDF
             </Button>
@@ -160,9 +199,9 @@ export function ReportsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All</SelectItem>
-                {Array.from(new Set(products.map((p: any) => String(p.category)))).map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
+                {categories.map((c) => (
+                  <SelectItem key={c.value} value={c.value}>
+                    {c.label}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -171,7 +210,27 @@ export function ReportsPage() {
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+      <div ref={reportRef} className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-4">
+          <Card className="rounded-xl p-4">
+            <p className="text-sm text-muted-foreground">Revenue</p>
+            <p className="text-2xl font-semibold">{currency(summaryStats.revenue)}</p>
+          </Card>
+          <Card className="rounded-xl p-4">
+            <p className="text-sm text-muted-foreground">Transactions</p>
+            <p className="text-2xl font-semibold">{summaryStats.transactions}</p>
+          </Card>
+          <Card className="rounded-xl p-4">
+            <p className="text-sm text-muted-foreground">Wastage loss</p>
+            <p className="text-2xl font-semibold">{currency(summaryStats.wastageLoss)}</p>
+          </Card>
+          <Card className="rounded-xl p-4">
+            <p className="text-sm text-muted-foreground">Top product</p>
+            <p className="text-2xl font-semibold">{summaryStats.topProduct}</p>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
         <ChartCard title="Revenue trend" description="Last 14 days">
           <ResponsiveContainer width="100%" height={280}>
             <LineChart
@@ -243,9 +302,9 @@ export function ReportsPage() {
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
-      </div>
+        </div>
 
-      <Card className="rounded-xl p-5 mt-4">
+        <Card className="rounded-xl p-5 mt-4">
         <h3 className="font-semibold mb-4">Sales report preview</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -280,7 +339,8 @@ export function ReportsPage() {
             </tbody>
           </table>
         </div>
-      </Card>
+        </Card>
+      </div>
     </>
   );
 }

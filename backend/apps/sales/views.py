@@ -26,6 +26,26 @@ class SaleViewSet(viewsets.ModelViewSet):
     filterset_fields = ['date', 'cashier', 'payment_method', 'is_void']
     search_fields = ['reference_number', 'notes']
 
+    def get_queryset(self):
+        queryset = Sale.objects.select_related('cashier').prefetch_related('items').order_by('-date')
+        params = self.request.query_params
+
+        product_id = params.get('product')
+        category_id = params.get('category')
+        batch_id = params.get('batch')
+        salesperson_id = params.get('salesperson')
+
+        if product_id:
+            queryset = queryset.filter(items__product_id=product_id)
+        if category_id:
+            queryset = queryset.filter(items__product__category_id=category_id)
+        if batch_id:
+            queryset = queryset.filter(items__batch_id=batch_id)
+        if salesperson_id:
+            queryset = queryset.filter(cashier_id=salesperson_id)
+
+        return queryset.distinct()
+
     def get_serializer_class(self):
         if self.action == 'create':
             return SaleCreateSerializer

@@ -23,6 +23,7 @@ export function LoginPage() {
   const { login, user } = useAuth();
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (user) router.navigate({ to: "/app/dashboard" });
@@ -36,7 +37,7 @@ export function LoginPage() {
     watch,
   } = useForm<Form>({
     resolver: zodResolver(schema),
-    defaultValues: { email: "", password: "demo1234", remember: true },
+    defaultValues: { email: "", password: "", remember: true },
   });
 
   const onSubmit = async (data: Form) => {
@@ -122,15 +123,24 @@ export function LoginPage() {
                   </Link>
                 </div>
                 <Input
-                  id="password"
-                  type="password"
-                  autoComplete="current-password"
-                  {...register("password")}
-                />
+  id="password"
+  type={showPassword ? "text" : "password"}
+  autoComplete="current-password"
+  {...register("password")}
+/>
                 {errors.password && (
                   <p className="text-xs text-destructive">{errors.password.message}</p>
                 )}
-                <div className="text-right"></div>
+                <div className="text-right">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? "Hide" : "Show"}
+                  </Button>
+                </div>
               </div>
             </div>
 

@@ -236,7 +236,7 @@ export function ProductsManagementPage() {
                 {addProductMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  "Save Product Variant Definition"
+                  "Save Product"
                 )}
               </Button>
             </div>

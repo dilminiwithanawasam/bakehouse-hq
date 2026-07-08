@@ -1,5 +1,7 @@
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
 import { api } from "@/services/api";
 import {
   Area,
@@ -28,6 +30,8 @@ import {
   Download,
   ShoppingCart,
   Boxes,
+  CalendarIcon,
+  X,
 } from "lucide-react";
 
 import { PageHeader } from "@/components/common/page-header";
@@ -36,9 +40,13 @@ import { ChartCard } from "./components/chart-card";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { useAuth } from "@/context/AuthContext";
 import { currency } from "@/services/mockData";
+import html2canvas from "html2canvas-pro";
+import jsPDF from "jspdf";
+import { toast } from "sonner";
 
 type DashboardProductSalesItem = {
   id: string | number;
@@ -71,9 +79,19 @@ export function DashboardPage() {
 
 function ExecutiveDashboard() {
   const router = useRouter();
+  const reportRef = useRef<HTMLDivElement>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+
+  const dateFilter = selectedDate ? format(selectedDate, "yyyy-MM-dd") : undefined;
+
+  const dashboardFilters = useMemo(
+    () => (dateFilter ? { start_date: dateFilter, end_date: dateFilter } : undefined),
+    [dateFilter],
+  );
+
   const { data: response } = useQuery<any>({
-    queryKey: ["dashboard"],
-    queryFn: api.getDashboardData,
+    queryKey: ["dashboard", dateFilter],
+    queryFn: () => api.getDashboardData(dashboardFilters),
   });
 
   // Safely extract data from the API response wrapper
@@ -114,6 +132,75 @@ function ExecutiveDashboard() {
       loss: Number((w?.["total_loss"] as number) ?? 0),
     })) ?? [];
 
+  const exportPdf = async () => {
+    try {
+      if (!reportRef.current) {
+        throw new Error("Report content unavailable");
+      }
+
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 20;
+      const headerHeight = 90;
+
+      pdf.setFontSize(18);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Executive Dashboard Report", margin, 30);
+
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(120);
+      pdf.text(`Generated: ${new Date().toLocaleString()}`, margin, 46);
+
+      pdf.setFontSize(10);
+      pdf.setTextColor(60);
+      pdf.text(
+        dateFilter ? `Date filter: ${dateFilter}` : "Date filter: Today (live)",
+        margin,
+        62,
+      );
+
+      pdf.setDrawColor(220);
+      pdf.line(margin, headerHeight - 15, pageWidth - margin, headerHeight - 15);
+
+      const imgWidth = pageWidth - margin * 2;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const usableHeight = pageHeight - margin - headerHeight - 20;
+
+      let heightLeft = imgHeight;
+      let position = headerHeight;
+      let pageNum = 1;
+
+      pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+      heightLeft -= usableHeight;
+
+      addFooter(pdf, pageNum, pageWidth, pageHeight, margin);
+
+      while (heightLeft > 0) {
+        position = position - usableHeight - headerHeight;
+        pdf.addPage();
+        pageNum += 1;
+        pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+        addFooter(pdf, pageNum, pageWidth, pageHeight, margin);
+        heightLeft -= usableHeight;
+      }
+
+      pdf.save(`dashboard-report-${dateFilter || "today"}.pdf`);
+      toast.success("PDF download ready");
+    } catch (e: any) {
+      console.error("PDF export failed:", e);
+      toast.error(e?.message || "Failed to prepare PDF");
+    }
+  };
+
   return (
     <>
       <PageHeader
@@ -121,295 +208,290 @@ function ExecutiveDashboard() {
         description="Real-time view of outlet performance, inventory and losses."
         actions={
           <>
-            <Tabs defaultValue="today">
-              <TabsList className="rounded-lg">
-                <TabsTrigger value="today">Today</TabsTrigger>
-                <TabsTrigger value="week">Week</TabsTrigger>
-                <TabsTrigger value="month">Month</TabsTrigger>
-              </TabsList>
-            </Tabs>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                try {
-                  // Build CSV from top products
-                  const rows = productSales.map((p) => [p.name, p.qty, p.revenue]);
-                  const header = ["product", "qty", "revenue"];
-                  const csv = [header.join(",")].concat(rows.map((r) => r.join(","))).join("\n");
-                  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = `dashboard-top-products.csv`;
-                  document.body.appendChild(a);
-                  a.click();
-                  a.remove();
-                  URL.revokeObjectURL(url);
-                } catch (e) {
-                  /* ignore */
-                }
-              }}
-            >
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <CalendarIcon className="h-4 w-4 mr-2" />
+                  {selectedDate ? format(selectedDate, "PPP") : "Filter by date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={setSelectedDate}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+            {selectedDate && (
+              <Button variant="ghost" size="sm" onClick={() => setSelectedDate(undefined)}>
+                <X className="h-4 w-4 mr-1" />
+                Clear
+              </Button>
+            )}
+            <Button size="sm" onClick={exportPdf}>
               <Download className="h-4 w-4 mr-2" />
-              Export
+              Generate Report PDF
             </Button>
           </>
         }
       />
 
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-        <StatCard
-          label="Sales today"
-          value={currency(totalSalesToday)}
-          delta="+12.4% vs yesterday"
-          trend="up"
-          icon={ShoppingBag}
-        />
-        <StatCard
-          label="Items sold"
-          value={totalItemsToday}
-          delta="+8.1%"
-          trend="up"
-          icon={ShoppingBag}
-          accent="amber"
-        />
-        <StatCard
-          label="Wastage cost"
-          value={currency(wastageCost)}
-          delta="-4.2% vs avg"
-          trend="up"
-          icon={Trash2}
-          accent="destructive"
-        />
-        <StatCard
-          label="Net revenue"
-          value={currency(totalSalesToday - wastageCost)}
-          delta="+11.6%"
-          trend="up"
-          icon={TrendingUp}
-          accent="sage"
-        />
-        <StatCard
-          label="Low stock alerts"
-          value={lowStockCount + outOfStockCount}
-          delta={`${lowStockCount + outOfStockCount} need restock`}
-          trend="down"
-          icon={AlertTriangle}
-          accent="destructive"
-        />
-        <StatCard
-          label="Top product"
-          value={best?.name ?? "—"}
-          delta={`${best?.qty ?? 0} sold`}
-          icon={Star}
-          accent="amber"
-        />
-      </div>
+      <div ref={reportRef} className="space-y-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+          <StatCard
+            label="Sales today"
+            value={currency(totalSalesToday)}
+            delta="+12.4% vs yesterday"
+            trend="up"
+            icon={ShoppingBag}
+          />
+          <StatCard
+            label="Items sold"
+            value={totalItemsToday}
+            delta="+8.1%"
+            trend="up"
+            icon={ShoppingBag}
+            accent="amber"
+          />
+          <StatCard
+            label="Wastage cost"
+            value={currency(wastageCost)}
+            delta="-4.2% vs avg"
+            trend="up"
+            icon={Trash2}
+            accent="destructive"
+          />
+          <StatCard
+            label="Net revenue"
+            value={currency(totalSalesToday - wastageCost)}
+            delta="+11.6%"
+            trend="up"
+            icon={TrendingUp}
+            accent="sage"
+          />
+          <StatCard
+            label="Low stock alerts"
+            value={lowStockCount + outOfStockCount}
+            delta={`${lowStockCount + outOfStockCount} need restock`}
+            trend="down"
+            icon={AlertTriangle}
+            accent="destructive"
+          />
+          <StatCard
+            label="Top product"
+            value={best?.name ?? "—"}
+            delta={`${best?.qty ?? 0} sold`}
+            icon={Star}
+            accent="amber"
+          />
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
-        <ChartCard title="Daily sales trend" description="Last 14 days" className="lg:col-span-2">
-          <ResponsiveContainer width="100%" height={280}>
-            <AreaChart data={data?.period_comparison?.current_period?.dates ?? []}>
-              <defs>
-                <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-              <XAxis
-                dataKey="date"
-                stroke="var(--muted-foreground)"
-                fontSize={11}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                stroke="var(--muted-foreground)"
-                fontSize={11}
-                tickLine={false}
-                axisLine={false}
-              />
-              <Tooltip contentStyle={tooltipStyle} />
-              <Area
-                type="monotone"
-                dataKey="revenue"
-                stroke="var(--chart-1)"
-                fill="url(#g1)"
-                strokeWidth={2}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </ChartCard>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+          <ChartCard title="Daily sales trend" description="Last 14 days" className="lg:col-span-2">
+            <ResponsiveContainer width="100%" height={280}>
+              <AreaChart data={data?.period_comparison?.current_period?.dates ?? []}>
+                <defs>
+                  <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  stroke="var(--muted-foreground)"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  stroke="var(--muted-foreground)"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Area
+                  type="monotone"
+                  dataKey="revenue"
+                  stroke="var(--chart-1)"
+                  fill="url(#g1)"
+                  strokeWidth={2}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </ChartCard>
 
-        <ChartCard title="Category mix" description="Share of revenue">
-          <ResponsiveContainer width="100%" height={280}>
-            <PieChart>
-              <Pie
-                data={data?.period_comparison?.current_period?.categories ?? []}
-                dataKey="total"
-                nameKey="name"
-                innerRadius={55}
-                outerRadius={90}
-                paddingAngle={3}
-              >
-                {(data?.period_comparison?.current_period?.categories ?? []).map(
-                  (_: unknown, i: number) => (
-                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                  ),
-                )}
-              </Pie>
-              <Tooltip contentStyle={tooltipStyle} />
-              <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-            </PieChart>
-          </ResponsiveContainer>
-        </ChartCard>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
-        <ChartCard title="Sales by hour" description="Today's hourly volume">
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={data?.period_comparison?.current_period?.hourly ?? []}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-              <XAxis
-                dataKey="hour"
-                stroke="var(--muted-foreground)"
-                fontSize={10}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                stroke="var(--muted-foreground)"
-                fontSize={10}
-                tickLine={false}
-                axisLine={false}
-              />
-              <Tooltip contentStyle={tooltipStyle} />
-              <Bar dataKey="sales" fill="var(--chart-2)" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        <ChartCard title="Wastage trend" description="Daily loss">
-          <ResponsiveContainer width="100%" height={240}>
-            <LineChart data={wastageTrend}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-              <XAxis
-                dataKey="reason"
-                stroke="var(--muted-foreground)"
-                fontSize={10}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                stroke="var(--muted-foreground)"
-                fontSize={10}
-                tickLine={false}
-                axisLine={false}
-              />
-              <Tooltip contentStyle={tooltipStyle} />
-              <Line
-                type="monotone"
-                dataKey="loss"
-                stroke="var(--destructive)"
-                strokeWidth={2}
-                dot={{ r: 3 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        <ChartCard title="Top selling products" description="By quantity sold">
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={productSales.slice(0, 5)} layout="vertical" margin={{ left: 120 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-              <XAxis
-                type="number"
-                stroke="var(--muted-foreground)"
-                fontSize={10}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                dataKey="name"
-                type="category"
-                width={110}
-                stroke="var(--muted-foreground)"
-                fontSize={10}
-                tickLine={false}
-                axisLine={false}
-              />
-              <Tooltip contentStyle={tooltipStyle} />
-              <Bar dataKey="qty" fill="var(--chart-1)" radius={[0, 6, 6, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
-        <Card className="rounded-xl p-5 lg:col-span-2">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold">Top selling products</h3>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.navigate({ to: "/app/reports" })}
-            >
-              View all
-            </Button>
-          </div>
-          <div className="space-y-2">
-            {productSales.slice(0, 6).map((p) => (
-              <div
-                key={p.id}
-                className="flex items-center justify-between py-2 border-b last:border-0"
-              >
-                <div>
-                  <div className="text-sm font-medium">{p.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {p.qty} units · {currency(p.revenue)}
-                  </div>
-                </div>
-                <div className="text-sm font-semibold">{currency(p.revenue)}</div>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <Card className="rounded-xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold">Stock alerts</h3>
-            <Badge variant="secondary" className="bg-destructive/10 text-destructive border-0">
-              {lowStockCount + outOfStockCount}
-            </Badge>
-          </div>
-          <div className="space-y-2">
-            {lowStock.slice(0, 6).map((p) => (
-              <div
-                key={p.id}
-                className="flex items-center justify-between py-2 border-b last:border-0"
-              >
-                <div>
-                  <div className="text-sm font-medium">{p.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    Min {p.minStock} · {p.category}
-                  </div>
-                </div>
-                <Badge
-                  variant="secondary"
-                  className={
-                    p.stock === 0
-                      ? "bg-destructive/10 text-destructive border-0"
-                      : "bg-accent/40 text-foreground border-0"
-                  }
+          <ChartCard title="Category mix" description="Share of revenue">
+            <ResponsiveContainer width="100%" height={280}>
+              <PieChart>
+                <Pie
+                  data={data?.period_comparison?.current_period?.categories ?? []}
+                  dataKey="total"
+                  nameKey="name"
+                  innerRadius={55}
+                  outerRadius={90}
+                  paddingAngle={3}
                 >
-                  {p.stock === 0 ? "Out" : `${p.stock} left`}
-                </Badge>
-              </div>
-            ))}
-          </div>
-        </Card>
+                  {(data?.period_comparison?.current_period?.categories ?? []).map(
+                    (_: unknown, i: number) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ),
+                  )}
+                </Pie>
+                <Tooltip contentStyle={tooltipStyle} />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+          <ChartCard title="Sales by hour" description="Today's hourly volume">
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={data?.period_comparison?.current_period?.hourly ?? []}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis
+                  dataKey="hour"
+                  stroke="var(--muted-foreground)"
+                  fontSize={10}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  stroke="var(--muted-foreground)"
+                  fontSize={10}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Bar dataKey="sales" fill="var(--chart-2)" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+
+          <ChartCard title="Wastage trend" description="Daily loss">
+            <ResponsiveContainer width="100%" height={240}>
+              <LineChart data={wastageTrend}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis
+                  dataKey="reason"
+                  stroke="var(--muted-foreground)"
+                  fontSize={10}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  stroke="var(--muted-foreground)"
+                  fontSize={10}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Line
+                  type="monotone"
+                  dataKey="loss"
+                  stroke="var(--destructive)"
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </ChartCard>
+
+          <ChartCard title="Top selling products" description="By quantity sold">
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={productSales.slice(0, 5)} layout="vertical" margin={{ left: 120 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+                <XAxis
+                  type="number"
+                  stroke="var(--muted-foreground)"
+                  fontSize={10}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  dataKey="name"
+                  type="category"
+                  width={110}
+                  stroke="var(--muted-foreground)"
+                  fontSize={10}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Bar dataKey="qty" fill="var(--chart-1)" radius={[0, 6, 6, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+          <Card className="rounded-xl p-5 lg:col-span-2">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold">Top selling products</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.navigate({ to: "/app/reports" })}
+              >
+                View all
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {productSales.slice(0, 6).map((p) => (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between py-2 border-b last:border-0"
+                >
+                  <div>
+                    <div className="text-sm font-medium">{p.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {p.qty} units · {currency(p.revenue)}
+                    </div>
+                  </div>
+                  <div className="text-sm font-semibold">{currency(p.revenue)}</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card className="rounded-xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold">Stock alerts</h3>
+              <Badge variant="secondary" className="bg-destructive/10 text-destructive border-0">
+                {lowStockCount + outOfStockCount}
+              </Badge>
+            </div>
+            <div className="space-y-2">
+              {lowStock.slice(0, 6).map((p) => (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between py-2 border-b last:border-0"
+                >
+                  <div>
+                    <div className="text-sm font-medium">{p.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      Min {p.minStock} · {p.category}
+                    </div>
+                  </div>
+                  <Badge
+                    variant="secondary"
+                    className={
+                      p.stock === 0
+                        ? "bg-destructive/10 text-destructive border-0"
+                        : "bg-accent/40 text-foreground border-0"
+                    }
+                  >
+                    {p.stock === 0 ? "Out" : `${p.stock} left`}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
       </div>
     </>
   );
@@ -418,7 +500,7 @@ function ExecutiveDashboard() {
 function SalespersonDashboard() {
   const { data: response } = useQuery<any>({
     queryKey: ["dashboard"],
-    queryFn: api.getDashboardData,
+    queryFn: () => api.getDashboardData(),
   });
 
   const data = response?.data || response;
@@ -543,6 +625,20 @@ function SalespersonDashboard() {
       </Card>
     </>
   );
+}
+
+function addFooter(
+  pdf: jsPDF,
+  pageNum: number,
+  pageWidth: number,
+  pageHeight: number,
+  margin: number,
+) {
+  pdf.setFontSize(8);
+  pdf.setTextColor(150);
+  pdf.setFont("helvetica", "normal");
+  pdf.text(`Page ${pageNum}`, pageWidth - margin - 30, pageHeight - 10);
+  pdf.text("Generated by TestCraft POS", margin, pageHeight - 10);
 }
 
 const tooltipStyle: React.CSSProperties = {

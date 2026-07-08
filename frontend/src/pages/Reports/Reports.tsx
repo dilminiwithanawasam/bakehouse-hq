@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
-import html2canvas from "html2canvas";
+import html2canvas from "html2canvas-pro";
 import jsPDF from "jspdf";
 import { api } from "@/services/api";
 import { currency } from "@/services/mockData";
@@ -56,11 +56,19 @@ export function ReportsPage() {
   });
   const { data: salesReport } = useQuery({
     queryKey: ["reports", "sales", from, to, product, cat],
-    queryFn: () => api.getSalesReport(reportFilters.start_date, reportFilters.end_date, { product: reportFilters.product, category: reportFilters.category }),
+    queryFn: () =>
+      api.getSalesReport(reportFilters.start_date, reportFilters.end_date, {
+        product: reportFilters.product,
+        category: reportFilters.category,
+      }),
   });
   const { data: wastageReport } = useQuery({
     queryKey: ["reports", "wastage", from, to, product, cat],
-    queryFn: () => api.getWastageReport(reportFilters.start_date, reportFilters.end_date, { product: reportFilters.product, category: reportFilters.category }),
+    queryFn: () =>
+      api.getWastageReport(reportFilters.start_date, reportFilters.end_date, {
+        product: reportFilters.product,
+        category: reportFilters.category,
+      }),
   });
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
@@ -100,9 +108,18 @@ export function ReportsPage() {
     .slice(0, 8);
 
   const summaryStats = useMemo(() => {
-    const revenue = (salesReport?.by_date || []).reduce((sum: number, item: any) => sum + Number(item.total_revenue || 0), 0);
-    const transactions = (salesReport?.by_date || []).reduce((sum: number, item: any) => sum + Number(item.transaction_count || 0), 0);
-    const wastageLoss = (wastageReport?.trend || []).reduce((sum: number, item: any) => sum + Number(item.total_loss || 0), 0);
+    const revenue = (salesReport?.by_date || []).reduce(
+      (sum: number, item: any) => sum + Number(item.total_revenue || 0),
+      0,
+    );
+    const transactions = (salesReport?.by_date || []).reduce(
+      (sum: number, item: any) => sum + Number(item.transaction_count || 0),
+      0,
+    );
+    const wastageLoss = (wastageReport?.trend || []).reduce(
+      (sum: number, item: any) => sum + Number(item.total_loss || 0),
+      0,
+    );
     const topProduct = topProducts[0];
 
     return {
@@ -124,28 +141,77 @@ export function ReportsPage() {
         backgroundColor: "#ffffff",
         useCORS: true,
       });
+
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pageWidth - 40;
+      const margin = 20;
+
+      // ---- Header (drawn once, at the top of page 1) ----
+      const headerHeight = 90;
+
+      const activeFilters: string[] = [];
+      if (from) activeFilters.push(`From: ${from}`);
+      if (to) activeFilters.push(`To: ${to}`);
+      if (product !== "all") {
+        const p = products.find((p: any) => String(p.id) === product);
+        activeFilters.push(`Product: ${p?.name || product}`);
+      }
+      if (cat !== "all") {
+        const c = categories.find((c) => c.value === cat);
+        activeFilters.push(`Category: ${c?.label || cat}`);
+      }
+
+      pdf.setFontSize(18);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Sales & Wastage Report", margin, 30);
+
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(120);
+      pdf.text(`Generated: ${new Date().toLocaleString()}`, margin, 46);
+
+      pdf.setFontSize(10);
+      pdf.setTextColor(60);
+      pdf.text(
+        activeFilters.length
+          ? `Filters: ${activeFilters.join("   •   ")}`
+          : "Filters: None (showing all data)",
+        margin,
+        62,
+      );
+
+      pdf.setDrawColor(220);
+      pdf.line(margin, headerHeight - 15, pageWidth - margin, headerHeight - 15);
+
+      // ---- Report image, offset below the header ----
+      const imgWidth = pageWidth - margin * 2;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let remainingHeight = imgHeight;
-      let position = 20;
+      const usableHeight = pageHeight - margin - headerHeight - 20; // room for footer
 
-      pdf.addImage(imgData, "PNG", 20, position, imgWidth, imgHeight);
-      remainingHeight -= pageHeight - 40;
+      let heightLeft = imgHeight;
+      let position = headerHeight;
+      let pageNum = 1;
 
-      while (remainingHeight > 0) {
+      pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+      heightLeft -= usableHeight;
+
+      addFooter(pdf, pageNum, pageWidth, pageHeight, margin);
+
+      while (heightLeft > 0) {
+        position = position - usableHeight - headerHeight;
         pdf.addPage();
-        position = 20 - (pageHeight - 40) * (1 + Math.floor((imgHeight - remainingHeight) / (pageHeight - 40)));
-        pdf.addImage(imgData, "PNG", 20, position, imgWidth, imgHeight);
-        remainingHeight -= pageHeight - 40;
+        pageNum += 1;
+        pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+        addFooter(pdf, pageNum, pageWidth, pageHeight, margin);
+        heightLeft -= usableHeight;
       }
 
       pdf.save(`sales-report-${from || "all"}-${to || "all"}.pdf`);
       toast.success("PDF download ready");
     } catch (e: any) {
+      console.error("PDF export failed:", e);
       toast.error(e?.message || "Failed to prepare PDF");
     }
   };
@@ -231,118 +297,134 @@ export function ReportsPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-        <ChartCard title="Revenue trend" description="Last 14 days">
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart
-              data={(salesReport?.by_date || []).map((d: any) => ({
-                date: d.date,
-                revenue: d.total_revenue || d.total || 0,
-                orders: d.transaction_count || d.transaction_count,
-              }))}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-              <XAxis
-                dataKey="date"
-                stroke="var(--muted-foreground)"
-                fontSize={11}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                stroke="var(--muted-foreground)"
-                fontSize={11}
-                tickLine={false}
-                axisLine={false}
-              />
-              <Tooltip contentStyle={tooltipStyle} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Line
-                type="monotone"
-                dataKey="revenue"
-                stroke="var(--chart-1)"
-                strokeWidth={2}
-                dot={{ r: 3 }}
-              />
-              <Line
-                type="monotone"
-                dataKey="orders"
-                stroke="var(--chart-2)"
-                strokeWidth={2}
-                dot={{ r: 3 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </ChartCard>
+          <ChartCard title="Revenue trend" description="Last 14 days">
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart
+                data={(salesReport?.by_date || []).map((d: any) => ({
+                  date: d.date,
+                  revenue: d.total_revenue || d.total || 0,
+                  orders: d.transaction_count || 0,
+                }))}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  stroke="var(--muted-foreground)"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  stroke="var(--muted-foreground)"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Line
+                  type="monotone"
+                  dataKey="revenue"
+                  stroke="var(--chart-1)"
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="orders"
+                  stroke="var(--chart-2)"
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </ChartCard>
 
-        <ChartCard title="Product ranking" description="Sold vs wasted units">
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={productRanking}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-              <XAxis
-                dataKey="name"
-                stroke="var(--muted-foreground)"
-                fontSize={10}
-                tickLine={false}
-                axisLine={false}
-                interval={0}
-                angle={-25}
-                textAnchor="end"
-                height={70}
-              />
-              <YAxis
-                stroke="var(--muted-foreground)"
-                fontSize={11}
-                tickLine={false}
-                axisLine={false}
-              />
-              <Tooltip contentStyle={tooltipStyle} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="sold" fill="var(--chart-1)" radius={[6, 6, 0, 0]} />
-              <Bar dataKey="wasted" fill="var(--chart-3)" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
+          <ChartCard title="Product ranking" description="Sold vs wasted units">
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={productRanking}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis
+                  dataKey="name"
+                  stroke="var(--muted-foreground)"
+                  fontSize={10}
+                  tickLine={false}
+                  axisLine={false}
+                  interval={0}
+                  angle={-25}
+                  textAnchor="end"
+                  height={70}
+                />
+                <YAxis
+                  stroke="var(--muted-foreground)"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar dataKey="sold" fill="var(--chart-1)" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="wasted" fill="var(--chart-3)" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
         </div>
 
         <Card className="rounded-xl p-5 mt-4">
-        <h3 className="font-semibold mb-4">Sales report preview</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-left text-muted-foreground border-b">
-              <tr>
-                <th className="py-2">Date</th>
-                <th>Sale #</th>
-                <th>Cashier</th>
-                <th>Items</th>
-                <th className="text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentSales.slice(0, 10).map((s: any) => (
-                <tr key={s.id} className="border-b last:border-0">
-                  <td className="py-2 text-muted-foreground">{s.date}</td>
-                  <td className="font-medium">#{String(s.id).toUpperCase()}</td>
-                  <td>{s.cashier || s.recordedBy || "—"}</td>
-                  <td>
-                    {(s.items || [])
-                      .map(
-                        (i: any) =>
-                          `${products.find((p: any) => p.id === i.product || i.productId)?.name || i.product || i.productId}×${i.quantity || i.qty}`,
-                      )
-                      .join(", ")}
-                  </td>
-                  <td className="text-right font-semibold">
-                    {currency(s.total || s.grand_total || 0)}
-                  </td>
+          <h3 className="font-semibold mb-4">Sales report preview</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-muted-foreground border-b">
+                <tr>
+                  <th className="py-2">Date</th>
+                  <th>Sale #</th>
+                  <th>Cashier</th>
+                  <th>Items</th>
+                  <th className="text-right">Total</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {recentSales.slice(0, 10).map((s: any) => (
+                  <tr key={s.id} className="border-b last:border-0">
+                    <td className="py-2 text-muted-foreground">{s.date}</td>
+                    <td className="font-medium">#{String(s.id).toUpperCase()}</td>
+                    <td>{s.cashier || s.recordedBy || "—"}</td>
+                    <td>
+                      {(s.items || [])
+                        .map((i: any) => {
+                          const p = products.find(
+                            (p: any) => p.id === (i.product ?? i.productId),
+                          );
+                          return `${p?.name || i.product || i.productId}×${i.quantity || i.qty}`;
+                        })
+                        .join(", ")}
+                    </td>
+                    <td className="text-right font-semibold">
+                      {currency(s.total || s.grand_total || 0)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </Card>
       </div>
     </>
   );
+}
+
+function addFooter(
+  pdf: jsPDF,
+  pageNum: number,
+  pageWidth: number,
+  pageHeight: number,
+  margin: number,
+) {
+  pdf.setFontSize(8);
+  pdf.setTextColor(150);
+  pdf.setFont("helvetica", "normal");
+  pdf.text(`Page ${pageNum}`, pageWidth - margin - 30, pageHeight - 10);
+  pdf.text("Generated by TestCraft POS", margin, pageHeight - 10);
 }
 
 const tooltipStyle: React.CSSProperties = {

@@ -25,10 +25,12 @@ import {
   type Product,
   type ProductBatch,
 } from "@/services/api";
-
+import { usePermission } from "@/hooks/use-permission";
+import { PERMISSIONS } from "@/lib/permissions";
 
 export function ProductsManagementPage() {
-  
+  const canCreateProduct = usePermission(PERMISSIONS.PRODUCT_CREATE);
+  const canCreateBatch = usePermission(PERMISSIONS.BATCH_CREATE);
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState<"products" | "batches">("products");
 
@@ -215,7 +217,7 @@ export function ProductsManagementPage() {
                   setValidationError(null);
                   addProductMutation.mutate();
                 }}
-                disabled={addProductMutation.isPending}
+                disabled={addProductMutation.isPending || !canCreateProduct}
               >
                 {addProductMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -349,7 +351,7 @@ export function ProductsManagementPage() {
                   setValidationError(null);
                   addBatchMutation.mutate();
                 }}
-                disabled={addBatchMutation.isPending}
+                disabled={addBatchMutation.isPending || !canCreateBatch}
               >
                 {addBatchMutation.isPending ? (
                   <div className="flex items-center justify-center">

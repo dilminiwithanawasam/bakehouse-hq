@@ -28,6 +28,8 @@ import { Separator } from "@/components/ui/separator";
 import { currency } from "@/services/mockData";
 import { api, type Product, type ProductBatch } from "@/services/api";
 import { useAuth } from "@/context/AuthContext";
+import { usePermission } from "@/hooks/use-permission";
+import { PERMISSIONS } from "@/lib/permissions";
 
 interface LineItem {
   id: string;
@@ -49,6 +51,7 @@ const lineSchema = z.object({
 export function SalesPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const canCreateSale = usePermission(PERMISSIONS.SALES_CREATE);
 
   // Fetch active catalogs from the backend system database
   const {
@@ -269,7 +272,7 @@ export function SalesPage() {
                 <Input value={product ? currency(product.price) : "—"} disabled />
               </div>
 
-              <Button onClick={addItem} className="h-10">
+              <Button onClick={addItem} className="h-10" disabled={!canCreateSale}>
                 <Plus className="h-4 w-4 mr-1" />
                 Add
               </Button>
@@ -353,7 +356,7 @@ export function SalesPage() {
           <Button
             className="w-full mt-5 h-11 text-white font-extrabold"
             onClick={() => save.mutate()}
-            disabled={save.isPending || items.length === 0}
+            disabled={save.isPending || items.length === 0 || !canCreateSale}
           >
             {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save sale"}
           </Button>

@@ -26,6 +26,8 @@ import {
 } from "@/components/ui/table";
 import { api } from "@/services/api";
 import { cn } from "@/utils/utils";
+import { usePermission } from "@/hooks/use-permission";
+import { PERMISSIONS } from "@/lib/permissions";
 
 function statusOf(stock: number, min: number) {
   if (stock === 0)
@@ -37,6 +39,7 @@ function statusOf(stock: number, min: number) {
 
 export function StockPage() {
   const qc = useQueryClient();
+  const canUpdateStock = usePermission(PERMISSIONS.BATCH_EDIT);
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
     queryFn: () => api.listProducts(),
@@ -172,7 +175,7 @@ export function StockPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={c === null || c === undefined}
+                      disabled={c === null || c === undefined || !canUpdateStock}
                       onClick={() => {
                         if (c !== null && c !== undefined) {
                           updateStock.mutate({ id: p.id, stock: c });

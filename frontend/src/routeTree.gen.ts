@@ -26,6 +26,7 @@ import { Route as AppProductsRouteImport } from './routes/app.products'
 import { Route as AppPaymentsRouteImport } from './routes/app.payments'
 import { Route as AppOutletsRouteImport } from './routes/app.outlets'
 import { Route as AppOrdersRouteImport } from './routes/app.orders'
+import { Route as AppFactoryOrdersRouteImport } from './routes/app.factory-orders'
 import { Route as AppDashboardRouteImport } from './routes/app.dashboard'
 
 const UnauthorizedRoute = UnauthorizedRouteImport.update({
@@ -113,6 +114,11 @@ const AppOrdersRoute = AppOrdersRouteImport.update({
   path: '/orders',
   getParentRoute: () => AppRoute,
 } as any)
+const AppFactoryOrdersRoute = AppFactoryOrdersRouteImport.update({
+  id: '/factory-orders',
+  path: '/factory-orders',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -127,6 +133,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/app/dashboard': typeof AppDashboardRoute
+  '/app/factory-orders': typeof AppFactoryOrdersRoute
   '/app/orders': typeof AppOrdersRoute
   '/app/outlets': typeof AppOutletsRoute
   '/app/payments': typeof AppPaymentsRoute
@@ -146,6 +153,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/app/dashboard': typeof AppDashboardRoute
+  '/app/factory-orders': typeof AppFactoryOrdersRoute
   '/app/orders': typeof AppOrdersRoute
   '/app/outlets': typeof AppOutletsRoute
   '/app/payments': typeof AppPaymentsRoute
@@ -167,6 +175,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/app/dashboard': typeof AppDashboardRoute
+  '/app/factory-orders': typeof AppFactoryOrdersRoute
   '/app/orders': typeof AppOrdersRoute
   '/app/outlets': typeof AppOutletsRoute
   '/app/payments': typeof AppPaymentsRoute
@@ -189,6 +198,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/unauthorized'
     | '/app/dashboard'
+    | '/app/factory-orders'
     | '/app/orders'
     | '/app/outlets'
     | '/app/payments'
@@ -208,6 +218,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/unauthorized'
     | '/app/dashboard'
+    | '/app/factory-orders'
     | '/app/orders'
     | '/app/outlets'
     | '/app/payments'
@@ -228,6 +239,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/unauthorized'
     | '/app/dashboard'
+    | '/app/factory-orders'
     | '/app/orders'
     | '/app/outlets'
     | '/app/payments'
@@ -371,6 +383,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrdersRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/factory-orders': {
+      id: '/app/factory-orders'
+      path: '/factory-orders'
+      fullPath: '/app/factory-orders'
+      preLoaderRoute: typeof AppFactoryOrdersRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/dashboard': {
       id: '/app/dashboard'
       path: '/dashboard'
@@ -383,6 +402,7 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppDashboardRoute: typeof AppDashboardRoute
+  AppFactoryOrdersRoute: typeof AppFactoryOrdersRoute
   AppOrdersRoute: typeof AppOrdersRoute
   AppOutletsRoute: typeof AppOutletsRoute
   AppPaymentsRoute: typeof AppPaymentsRoute
@@ -398,6 +418,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppDashboardRoute: AppDashboardRoute,
+  AppFactoryOrdersRoute: AppFactoryOrdersRoute,
   AppOrdersRoute: AppOrdersRoute,
   AppOutletsRoute: AppOutletsRoute,
   AppPaymentsRoute: AppPaymentsRoute,

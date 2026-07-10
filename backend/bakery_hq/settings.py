@@ -333,11 +333,7 @@ EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 
-# 1. 🚨 Action Required: Replace this with your own functional Gmail username address
-EMAIL_HOST_USER = 'dilminiwithanawasam1250@gmail.com'
-
-# 2. 🚨 Action Required: Replace this placeholder string with your unique 16-character Google App Password 
-# (Go to your Google Account -> Security -> 2-Step Verification -> App Passwords to generate this)
-EMAIL_HOST_PASSWORD = 'fwdn cxap xzgl fvms'
+EMAIL_HOST_USER = config('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
 
 DEFAULT_FROM_EMAIL = f"BakeryHUB Enterprise Security <{EMAIL_HOST_USER}>"

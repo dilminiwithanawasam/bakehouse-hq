@@ -156,7 +156,7 @@ export function LoginPage() {
             </div>
 
             <Button type="submit" className="w-full h-11 text-sm font-medium" disabled={submitting}>
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign in"}
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign Up"}
             </Button>
           </form>
         </Card>
